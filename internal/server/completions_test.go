@@ -17,7 +17,7 @@ import (
 func TestNormalizeCompletionsBody(t *testing.T) {
 	t.Parallel()
 
-	normalized, err := normalizeCompletionsBody([]byte(`{"model":"gpt-5.4","prompt":"hello","stream":true}`), nil)
+	normalized, err := normalizeCompletionsBody([]byte(`{"model":"gpt-5.6-terra","prompt":"hello","stream":true}`), nil)
 	if err != nil {
 		t.Fatalf("normalizeCompletionsBody() error = %v", err)
 	}
@@ -25,7 +25,7 @@ func TestNormalizeCompletionsBody(t *testing.T) {
 		t.Fatalf("normalized request = %#v", normalized)
 	}
 
-	_, err = normalizeCompletionsBody([]byte(`{"model":"gpt-5.4","prompt":["one","two"]}`), nil)
+	_, err = normalizeCompletionsBody([]byte(`{"model":"gpt-5.6-terra","prompt":["one","two"]}`), nil)
 	if err == nil || !strings.Contains(err.Error(), "multiple prompts") {
 		t.Fatalf("multiple prompt error = %v", err)
 	}
@@ -40,14 +40,14 @@ func TestHandleCompletionsReturnsTextCompletion(t *testing.T) {
 		return &fakeEventStream{events: []*codex.StreamEvent{{
 			Type: "response.completed",
 			Raw: map[string]any{"response": map[string]any{
-				"id": "resp_completion", "model": "gpt-5.4", "status": "completed", "output_text": "completed text",
+				"id": "resp_completion", "model": "gpt-5.6-terra", "status": "completed", "output_text": "completed text",
 			}},
 		}}}, nil
 	}
 
 	recorder := httptest.NewRecorder()
 	ctx, _ := gin.CreateTestContext(recorder)
-	ctx.Request = httptest.NewRequest(http.MethodPost, "/v1/completions", strings.NewReader(`{"model":"gpt-5.4","prompt":"complete me"}`))
+	ctx.Request = httptest.NewRequest(http.MethodPost, "/v1/completions", strings.NewReader(`{"model":"gpt-5.6-terra","prompt":"complete me"}`))
 	ctx.Request.Header.Set("Content-Type", "application/json")
 	app.handleCompletions(ctx)
 

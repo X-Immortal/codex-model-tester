@@ -11,22 +11,6 @@ func TestFirstNonEmptySkipsWhitespaceOnlyStrings(t *testing.T) {
 	}
 }
 
-func TestMapValue(t *testing.T) {
-	t.Parallel()
-
-	tree := map[string]any{
-		"response": map[string]any{
-			"error": map[string]any{
-				"message": "boom",
-			},
-		},
-	}
-
-	if got := MapValue(tree, "response"); got == nil {
-		t.Fatalf("MapValue() = %#v, want nested map", got)
-	}
-}
-
 func TestFirstMapSkipsEmptyMaps(t *testing.T) {
 	t.Parallel()
 

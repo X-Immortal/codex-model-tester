@@ -99,6 +99,7 @@ func (c *Catalog) LoadCache(snapshot CacheSnapshot) {
 		c.entriesByID[entry.ID] = cloneEntry(entry)
 	}
 	c.support = make(map[string]map[string]struct{}, len(snapshot.Support))
+	c.knownRoutes = make(map[string]struct{}, len(snapshot.Support))
 	for key, ids := range snapshot.Support {
 		c.knownRoutes[key] = struct{}{}
 		c.support[key] = makeSet(ids)
@@ -155,10 +156,6 @@ func (c *Catalog) Snapshot() CacheSnapshot {
 }
 
 func RoutingKeyForRecord(record accounts.Record) string {
-	planType := strings.TrimSpace(record.PlanType)
-	if planType != "" && !strings.EqualFold(planType, "unknown") {
-		return "plan:" + planType
-	}
 	return "acct:" + strings.TrimSpace(record.ID)
 }
 
@@ -176,7 +173,9 @@ func (c *Catalog) rebuildVisibleLocked() {
 	if c.hasUnrefreshedRoutesLocked() {
 		for _, entry := range c.bootstrap {
 			visibleIDs[entry.ID] = struct{}{}
-			c.entriesByID[entry.ID] = entry
+			if _, exists := c.entriesByID[entry.ID]; !exists {
+				c.entriesByID[entry.ID] = entry
+			}
 		}
 	}
 
@@ -222,7 +221,7 @@ func (c *Catalog) supportsRecordLocked(record accounts.Record, modelID string) b
 		return c.bootstrapContainsLocked(modelID)
 	}
 	key := RoutingKeyForRecord(record)
-	if set, ok := c.support[key]; ok && len(set) > 0 {
+	if set, ok := c.support[key]; ok {
 		_, ok = set[modelID]
 		return ok
 	}

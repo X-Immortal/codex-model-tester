@@ -15,7 +15,7 @@ func TestChatCompletionsTranslation(t *testing.T) {
 	t.Parallel()
 
 	request := ChatCompletionsRequest{
-		Model:              "gpt-5.4",
+		Model:              "gpt-6-astra",
 		ReasoningEffort:    "high",
 		ServiceTier:        "fast",
 		PreviousResponseID: "resp_prev_chat",
@@ -67,7 +67,7 @@ func TestChatCompletionsTranslation(t *testing.T) {
 		t.Fatalf("ChatCompletions() error = %v", err)
 	}
 
-	if normalized.Model != "gpt-5.4" {
+	if normalized.Model != "gpt-6-astra" {
 		t.Fatalf("model = %q, want explicit model passthrough", normalized.Model)
 	}
 	if normalized.Reasoning == nil || normalized.Reasoning.Effort != "high" {
@@ -116,7 +116,7 @@ func TestChatCompletionsTranslationPreservesTextVerbosity(t *testing.T) {
 
 	var request ChatCompletionsRequest
 	if err := json.Unmarshal([]byte(`{
-		"model": "gpt-5.4",
+		"model": "gpt-5.6-terra",
 		"messages": [{"role": "user", "content": "Hello"}],
 		"response_format": {"type": "json_object"},
 		"text": {"verbosity": "high"}
@@ -143,7 +143,7 @@ func TestInstructionFreeOpenAIRequestsStayInstructionFree(t *testing.T) {
 	t.Parallel()
 
 	chat, err := ChatCompletions(ChatCompletionsRequest{
-		Model: "gpt-5.4",
+		Model: "gpt-5.6-terra",
 		Messages: []ChatMessage{{
 			Role:    "user",
 			Content: MessageContent{{Type: "text", Text: "Hello"}},
@@ -157,7 +157,7 @@ func TestInstructionFreeOpenAIRequestsStayInstructionFree(t *testing.T) {
 	}
 
 	responses, err := Responses(ResponsesRequest{
-		Model: "gpt-5.4",
+		Model: "gpt-5.6-terra",
 		Input: ResponsesInput{Items: []ResponsesInputItem{{
 			Role:    "user",
 			Content: MessageContent{{Type: "text", Text: "Hello"}},
@@ -171,7 +171,7 @@ func TestInstructionFreeOpenAIRequestsStayInstructionFree(t *testing.T) {
 	}
 
 	compact, err := Compact(ResponsesCompactRequest{
-		Model: "gpt-5.4",
+		Model: "gpt-5.6-terra",
 		Input: ResponsesInput{Items: []ResponsesInputItem{{
 			Role:    "user",
 			Content: MessageContent{{Type: "text", Text: "Hello"}},
@@ -190,7 +190,7 @@ func TestResponsesTranslation(t *testing.T) {
 
 	toolChoice, _ := json.Marshal(map[string]any{"type": "function", "name": "lookup"})
 	request := ResponsesRequest{
-		Model:              "gpt-5.4",
+		Model:              "gpt-6-astra",
 		PreviousResponseID: "resp_prev",
 		PromptCacheKey:     "client-cache-key",
 		ServiceTier:        "priority",
@@ -226,7 +226,7 @@ func TestResponsesTranslation(t *testing.T) {
 		t.Fatalf("Responses() error = %v", err)
 	}
 
-	if normalized.Model != "gpt-5.4" {
+	if normalized.Model != "gpt-6-astra" {
 		t.Fatalf("model = %q", normalized.Model)
 	}
 	if normalized.ServiceTier != "priority" {
@@ -260,7 +260,7 @@ func TestResponsesTranslationPreservesVerbosityWithoutFormat(t *testing.T) {
 
 	var request ResponsesRequest
 	if err := json.Unmarshal([]byte(`{
-		"model": "gpt-5.4",
+		"model": "gpt-5.6-terra",
 		"input": "Hello",
 		"text": {"verbosity": "low"}
 	}`), &request); err != nil {
@@ -290,7 +290,7 @@ func TestOpenAIParallelToolCallsPreserved(t *testing.T) {
 			t.Parallel()
 
 			chat, err := ChatCompletions(ChatCompletionsRequest{
-				Model:             "gpt-5.4",
+				Model:             "gpt-5.6-terra",
 				ParallelToolCalls: &enabled,
 				Messages: []ChatMessage{{
 					Role:    "user",
@@ -305,7 +305,7 @@ func TestOpenAIParallelToolCallsPreserved(t *testing.T) {
 			}
 
 			responses, err := Responses(ResponsesRequest{
-				Model:             "gpt-5.4",
+				Model:             "gpt-5.6-terra",
 				ParallelToolCalls: &enabled,
 				Input:             ResponsesInput{String: "Hello"},
 			}, nil)
@@ -323,7 +323,7 @@ func TestOpenAIParallelToolCallsOmitted(t *testing.T) {
 	t.Parallel()
 
 	chat, err := ChatCompletions(ChatCompletionsRequest{
-		Model: "gpt-5.4",
+		Model: "gpt-5.6-terra",
 		Messages: []ChatMessage{{
 			Role:    "user",
 			Content: MessageContent{{Type: "text", Text: "Hello"}},
@@ -337,7 +337,7 @@ func TestOpenAIParallelToolCallsOmitted(t *testing.T) {
 	}
 
 	responses, err := Responses(ResponsesRequest{
-		Model: "gpt-5.4",
+		Model: "gpt-5.6-terra",
 		Input: ResponsesInput{String: "Hello"},
 	}, nil)
 	if err != nil {
@@ -352,7 +352,7 @@ func TestOpenAIServiceTierAutoUsesCodexDefault(t *testing.T) {
 	t.Parallel()
 
 	chat, err := ChatCompletions(ChatCompletionsRequest{
-		Model:       "gpt-5.4",
+		Model:       "gpt-5.6-terra",
 		ServiceTier: "auto",
 		Messages: []ChatMessage{{
 			Role:    "user",
@@ -367,7 +367,7 @@ func TestOpenAIServiceTierAutoUsesCodexDefault(t *testing.T) {
 	}
 
 	response, err := Responses(ResponsesRequest{
-		Model:       "gpt-5.4",
+		Model:       "gpt-5.6-terra",
 		ServiceTier: "auto",
 		Input:       ResponsesInput{String: "Hello"},
 	}, nil)
@@ -383,7 +383,7 @@ func TestResponsesTranslationUsesReasoningObject(t *testing.T) {
 	t.Parallel()
 
 	request := ResponsesRequest{
-		Model: "gpt-5.4",
+		Model: "gpt-5.6-terra",
 		Reasoning: &Reasoning{
 			Effort: "high",
 		},
@@ -477,7 +477,7 @@ func TestCompactTranslationPreservesTextVerbosity(t *testing.T) {
 
 	var request ResponsesCompactRequest
 	if err := json.Unmarshal([]byte(`{
-		"model": "gpt-5.4",
+		"model": "gpt-5.6-terra",
 		"input": "Compact this",
 		"text": {"verbosity": "medium"}
 	}`), &request); err != nil {
@@ -529,7 +529,7 @@ func TestResponsesTranslationExtractsInstructionRolesFromInput(t *testing.T) {
 	t.Parallel()
 
 	request := ResponsesRequest{
-		Model:        "gpt-5.4",
+		Model:        "gpt-5.6-terra",
 		Instructions: "Top-level instructions",
 		Input: ResponsesInput{
 			Items: []ResponsesInputItem{
@@ -581,7 +581,7 @@ func TestResponsesTranslationAcceptsModernFunctionToolShape(t *testing.T) {
 	t.Parallel()
 
 	request := ResponsesRequest{
-		Model: "gpt-5.4",
+		Model: "gpt-5.6-terra",
 		Input: ResponsesInput{
 			Items: []ResponsesInputItem{{
 				Role: "user",
@@ -625,7 +625,7 @@ func TestChatCompletionsTranslationPreservesCustomToolShape(t *testing.T) {
 	t.Parallel()
 
 	request := ChatCompletionsRequest{
-		Model: "gpt-5.4",
+		Model: "gpt-5.6-terra",
 		Messages: []ChatMessage{{
 			Role:    "user",
 			Content: MessageContent{{Type: "text", Text: "Patch the file"}},
@@ -678,7 +678,7 @@ func TestChatCompletionsTranslationPreservesCustomToolCallsAndOutputs(t *testing
 	t.Parallel()
 
 	request := ChatCompletionsRequest{
-		Model: "gpt-5.4",
+		Model: "gpt-5.6-terra",
 		Messages: []ChatMessage{
 			{
 				Role: "assistant",
@@ -725,7 +725,7 @@ func TestChatCompletionsTranslationMapsFunctionShapedReplayBackToCustomTool(t *t
 	t.Parallel()
 
 	request := ChatCompletionsRequest{
-		Model: "gpt-5.4",
+		Model: "gpt-5.6-terra",
 		Messages: []ChatMessage{
 			{
 				Role: "assistant",
@@ -832,7 +832,7 @@ func TestChatCompletionsTranslationSupportsWebSearchVariants(t *testing.T) {
 			t.Parallel()
 
 			request := ChatCompletionsRequest{
-				Model: "gpt-5.4",
+				Model: "gpt-5.6-terra",
 				Messages: []ChatMessage{{
 					Role:    "user",
 					Content: MessageContent{{Type: "text", Text: "Search the web"}},
@@ -861,7 +861,7 @@ func TestResponsesTranslationAcceptsAssistantOutputTextReplay(t *testing.T) {
 	t.Parallel()
 
 	request := ResponsesRequest{
-		Model: "gpt-5.4",
+		Model: "gpt-5.6-terra",
 		Input: ResponsesInput{
 			Items: []ResponsesInputItem{
 				{
@@ -903,7 +903,7 @@ func TestResponsesTranslationPreservesWebSearchCallReplayIdentity(t *testing.T) 
 	t.Parallel()
 
 	request := ResponsesRequest{
-		Model: "gpt-5.4",
+		Model: "gpt-5.6-terra",
 		Input: ResponsesInput{
 			Items: []ResponsesInputItem{
 				{
@@ -945,7 +945,7 @@ func TestResponsesTranslationPreservesToolOutputContentTypes(t *testing.T) {
 	t.Parallel()
 
 	request := ResponsesRequest{
-		Model: "gpt-5.4",
+		Model: "gpt-5.6-terra",
 		Input: ResponsesInput{
 			Items: []ResponsesInputItem{
 				{
@@ -985,7 +985,7 @@ func TestResponsesTranslationAcceptsInputFilePart(t *testing.T) {
 	t.Parallel()
 
 	request := ResponsesRequest{
-		Model: "gpt-5.4",
+		Model: "gpt-5.6-terra",
 		Input: ResponsesInput{
 			Items: []ResponsesInputItem{{
 				Role: "user",
@@ -1026,7 +1026,7 @@ func TestChatCompletionsTranslationAcceptsCanonicalFilePart(t *testing.T) {
 
 	var request ChatCompletionsRequest
 	err := json.Unmarshal([]byte(`{
-		"model":"gpt-5.4",
+		"model":"gpt-5.6-terra",
 		"messages":[{
 			"role":"user",
 			"content":[
@@ -1055,7 +1055,7 @@ func TestChatCompletionsTranslationPreservesMultimodalToolOutput(t *testing.T) {
 	t.Parallel()
 
 	request := ChatCompletionsRequest{
-		Model: "gpt-5.4",
+		Model: "gpt-5.6-terra",
 		Messages: []ChatMessage{
 			{
 				Role: "assistant",
@@ -1106,7 +1106,7 @@ func TestToolNamesAreShortenedConsistentlyAndRestored(t *testing.T) {
 		"function": map[string]any{"name": second},
 	})
 	request := ChatCompletionsRequest{
-		Model: "gpt-5.4",
+		Model: "gpt-5.6-terra",
 		Messages: []ChatMessage{{
 			Role: "assistant",
 			ToolCalls: []ToolCall{{
@@ -1162,7 +1162,7 @@ func TestResponsesShortensCustomToolNameAndChoice(t *testing.T) {
 	name := "custom_tool_with_a_name_that_is_deliberately_longer_than_sixty_four_characters_for_codex"
 	choice, _ := json.Marshal(map[string]any{"type": "custom", "name": name})
 	normalized, err := Responses(ResponsesRequest{
-		Model: "gpt-5.4",
+		Model: "gpt-5.6-terra",
 		Input: ResponsesInput{Items: []ResponsesInputItem{{
 			Type: "custom_tool_call", CallID: "call_1", Name: name, Input: "input",
 		}}},
@@ -1192,7 +1192,7 @@ func TestResponsesTranslationAcceptsReasoningItemReplay(t *testing.T) {
 	t.Parallel()
 
 	request := ResponsesRequest{
-		Model: "gpt-5.4",
+		Model: "gpt-5.6-terra",
 		Input: ResponsesInput{
 			Items: []ResponsesInputItem{{
 				Type:             "reasoning",
@@ -1244,7 +1244,7 @@ func TestUnsupportedContentPartRejected(t *testing.T) {
 	t.Parallel()
 
 	_, err := ChatCompletions(ChatCompletionsRequest{
-		Model: "gpt-5.4",
+		Model: "gpt-5.6-terra",
 		Messages: []ChatMessage{{
 			Role: "user",
 			Content: MessageContent{{
@@ -1262,7 +1262,7 @@ func TestChatCompletionsTranslationRejectsInvalidToolCallContent(t *testing.T) {
 	t.Parallel()
 
 	_, err := ChatCompletions(ChatCompletionsRequest{
-		Model: "gpt-5.4",
+		Model: "gpt-5.6-terra",
 		Messages: []ChatMessage{{
 			Role: "assistant",
 			Content: MessageContent{{
@@ -1331,15 +1331,23 @@ func TestToCodexWSCreatePayloadIncludesTurnControls(t *testing.T) {
 	parallel := false
 	request := turn.NormalizedRequest{
 		Request: codex.Request{
-			Model:             "gpt-5.4",
+			Model:             "gpt-5.6-terra",
 			Input:             []codex.InputItem{{Role: "user"}},
 			ParallelToolCalls: &parallel,
+			ServiceTier:       "priority",
 		},
 		Generate: &generate,
 	}
 	payload := request.ToCodexWSCreatePayload()
 	if payload["generate"] != false || payload["parallel_tool_calls"] != false {
 		t.Fatalf("payload = %#v", payload)
+	}
+	if payload["service_tier"] != "priority" {
+		t.Fatalf("WebSocket service_tier = %v, want priority", payload["service_tier"])
+	}
+	request.ServiceTier = ""
+	if _, exists := request.ToCodexWSCreatePayload()["service_tier"]; exists {
+		t.Fatal("omitted service tier should remain absent")
 	}
 }
 

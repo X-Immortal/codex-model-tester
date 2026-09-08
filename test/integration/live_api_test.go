@@ -107,7 +107,7 @@ func loadLiveConfig(t *testing.T) liveConfig {
 		cfg.BaseURL = "http://localhost:8080/v1"
 	}
 	if cfg.Model == "" {
-		cfg.Model = "gpt-5.2"
+		cfg.Model = "gpt-6-astra"
 	}
 
 	return cfg

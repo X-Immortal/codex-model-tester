@@ -31,6 +31,9 @@ func (r NormalizedRequest) ToCodexWSCreatePayload() map[string]any {
 	if r.Reasoning != nil {
 		payload["reasoning"] = r.Reasoning
 	}
+	if r.ServiceTier != "" {
+		payload["service_tier"] = r.ServiceTier
+	}
 	if r.PreviousResponseID != "" {
 		payload["previous_response_id"] = r.PreviousResponseID
 	}

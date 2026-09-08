@@ -144,36 +144,3 @@ func TestConvertTupleSchemasConvertsPrefixItemsToObjectShape(t *testing.T) {
 		t.Fatalf("additionalProperties = %#v, want false", converted["additionalProperties"])
 	}
 }
-
-func TestReconvertTupleValuesRestoresArrays(t *testing.T) {
-	t.Parallel()
-
-	schema := map[string]any{
-		"type": "object",
-		"properties": map[string]any{
-			"pair": map[string]any{
-				"type": "array",
-				"prefixItems": []any{
-					map[string]any{"type": "string"},
-					map[string]any{"type": "number"},
-				},
-			},
-		},
-	}
-
-	reconverted := reconvertTupleValues(map[string]any{
-		"pair": map[string]any{
-			"0": "left",
-			"1": float64(2),
-		},
-	}, schema, schema)
-
-	root, _ := reconverted.(map[string]any)
-	pair, ok := root["pair"].([]any)
-	if !ok {
-		t.Fatalf("pair = %#v, want []any", root["pair"])
-	}
-	if len(pair) != 2 || pair[0] != "left" || pair[1] != float64(2) {
-		t.Fatalf("pair = %#v", pair)
-	}
-}

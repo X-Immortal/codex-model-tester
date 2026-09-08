@@ -30,7 +30,6 @@ type fakeResponsesWebSocketStream struct {
 	active   []*codex.StreamEvent
 	requests []map[string]any
 	connects int
-	closed   bool
 }
 
 func (f *fakeResponsesWebSocketStream) begin(body any) error {
@@ -70,12 +69,7 @@ func (f *fakeResponsesWebSocketStream) NextEvent() (*codex.StreamEvent, error) {
 	return event, nil
 }
 
-func (f *fakeResponsesWebSocketStream) Close() error {
-	f.mu.Lock()
-	defer f.mu.Unlock()
-	f.closed = true
-	return nil
-}
+func (f *fakeResponsesWebSocketStream) Close() error { return nil }
 
 func (f *fakeResponsesWebSocketStream) Headers() http.Header {
 	return f.headers.Clone()
@@ -84,7 +78,7 @@ func (f *fakeResponsesWebSocketStream) Headers() http.Header {
 func TestResponsesWebSocketReusesUpstreamConnectionForContinuation(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 
-	const model = "gpt-5.4"
+	const model = "gpt-5.6-terra"
 	fakeStream := &fakeResponsesWebSocketStream{
 		headers: http.Header{"X-Codex-Turn-State": []string{"turn-state"}},
 		turns: [][]*codex.StreamEvent{
@@ -155,7 +149,7 @@ func TestResponsesWebSocketReusesUpstreamConnectionForContinuation(t *testing.T)
 func TestResponsesWebSocketContinuesAfterIncompleteResponse(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 
-	const model = "gpt-5.4"
+	const model = "gpt-5.6-terra"
 	fakeStream := &fakeResponsesWebSocketStream{
 		turns: [][]*codex.StreamEvent{
 			{
@@ -232,7 +226,7 @@ func TestResponsesWebSocketReturnsProtocolErrorsWithoutClosing(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 
 	fakeStream := &fakeResponsesWebSocketStream{
-		turns: [][]*codex.StreamEvent{responsesWebSocketTextEvents("resp_ws_valid", "gpt-5.4", "ok")},
+		turns: [][]*codex.StreamEvent{responsesWebSocketTextEvents("resp_ws_valid", "gpt-5.6-terra", "ok")},
 	}
 	app := newResponsesWebSocketTestApp(t, fakeStream)
 	server := httptest.NewServer(app.Handler())
@@ -259,7 +253,7 @@ func TestResponsesWebSocketReturnsProtocolErrorsWithoutClosing(t *testing.T) {
 
 	if err := conn.WriteJSON(map[string]any{
 		"type":  "response.create",
-		"model": "gpt-5.4",
+		"model": "gpt-5.6-terra",
 		"input": "valid after error",
 	}); err != nil {
 		t.Fatalf("valid WriteJSON() error = %v", err)
@@ -297,7 +291,7 @@ func TestNormalizeResponsesWebSocketMessagePreservesGenerateAndIgnoresStream(t *
 	generate := false
 	normalized, err := normalizeResponsesWebSocketMessage([]byte(`{
 		"type":"response.create",
-		"model":"gpt-5.4",
+		"model":"gpt-5.6-terra",
 		"stream":false,
 		"generate":false,
 		"text":{"verbosity":"high"},
@@ -370,7 +364,7 @@ func newResponsesWebSocketTestApp(t *testing.T, stream *fakeResponsesWebSocketSt
 	cfg := config.Config{
 		ProxyAPIKey:     "test-key",
 		CodexBaseURL:    "https://chatgpt.example/backend-api",
-		DefaultModel:    "gpt-5.4",
+		DefaultModel:    "gpt-5.6-terra",
 		ContinuationTTL: time.Minute,
 		RefreshSkew:     time.Minute,
 	}

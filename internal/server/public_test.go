@@ -32,7 +32,7 @@ func newFailoverTestApp(t *testing.T) *App {
 		&accounts.Record{ID: "acct-a", AccountID: "upstream-a", Status: accounts.StatusActive, Token: accounts.OAuthToken{AccessToken: "token-a", ExpiresAt: now.Add(time.Hour)}, CreatedAt: now, UpdatedAt: now},
 		&accounts.Record{ID: "acct-b", AccountID: "upstream-b", Status: accounts.StatusActive, Token: accounts.OAuthToken{AccessToken: "token-b", ExpiresAt: now.Add(time.Hour)}, CreatedAt: now, UpdatedAt: now},
 	)
-	cfg := config.Config{RefreshSkew: time.Minute, DefaultModel: "gpt-5.4", CodexBaseURL: "https://example.invalid"}
+	cfg := config.Config{RefreshSkew: time.Minute, DefaultModel: "gpt-5.6-terra", CodexBaseURL: "https://example.invalid"}
 	catalog := models.NewCatalog(models.BootstrapEntries())
 	return &App{
 		cfg:           cfg,
@@ -58,7 +58,7 @@ func TestOpenStreamFailsOverToAnotherAccount(t *testing.T) {
 		return &fakeEventStream{events: []*codex.StreamEvent{{Type: "response.completed"}}}, nil
 	}
 
-	account, stream, _, err := app.openStream(nil, context.Background(), "responses", &sessionResolution{Request: turn.NormalizedRequest{Request: codex.Request{Model: "gpt-5.4", Stream: true}, ModelExplicit: true}})
+	account, stream, _, err := app.openStream(nil, context.Background(), "responses", &sessionResolution{Request: turn.NormalizedRequest{Request: codex.Request{Model: "gpt-5.6-terra", Stream: true}, ModelExplicit: true}})
 	if err != nil {
 		t.Fatalf("openStream() error = %v", err)
 	}
@@ -87,7 +87,7 @@ func TestOpenStreamFailsOverWhenFirstEventIsRetryableFailure(t *testing.T) {
 		return &fakeEventStream{events: []*codex.StreamEvent{{Type: "response.created", Raw: map[string]any{"type": "response.created"}}}}, nil
 	}
 
-	account, stream, _, err := app.openStream(nil, context.Background(), "responses", &sessionResolution{Request: turn.NormalizedRequest{Request: codex.Request{Model: "gpt-5.4", Stream: true}, ModelExplicit: true}})
+	account, stream, _, err := app.openStream(nil, context.Background(), "responses", &sessionResolution{Request: turn.NormalizedRequest{Request: codex.Request{Model: "gpt-5.6-terra", Stream: true}, ModelExplicit: true}})
 	if err != nil {
 		t.Fatalf("openStream() error = %v", err)
 	}
@@ -122,7 +122,7 @@ func TestResponsesFailsOverWhenNonStreamingResponseFailsAfterFirstEvent(t *testi
 
 	recorder := httptest.NewRecorder()
 	ctx, _ := gin.CreateTestContext(recorder)
-	ctx.Request = httptest.NewRequest(http.MethodPost, "/v1/responses", strings.NewReader(`{"model":"gpt-5.4","input":"hello","stream":false}`))
+	ctx.Request = httptest.NewRequest(http.MethodPost, "/v1/responses", strings.NewReader(`{"model":"gpt-5.6-terra","input":"hello","stream":false}`))
 	ctx.Request.Header.Set("Content-Type", "application/json")
 	app.handleResponses(ctx)
 
@@ -162,7 +162,7 @@ func TestResponsesRecoversFromInvalidReasoningSignature(t *testing.T) {
 		return &fakeEventStream{events: []*codex.StreamEvent{{Type: "response.completed", Raw: map[string]any{"response": map[string]any{"id": "resp_recovered", "status": "completed"}}}}}, nil
 	}
 
-	body := `{"model":"gpt-5.4","stream":false,"input":[` +
+	body := `{"model":"gpt-5.6-terra","stream":false,"input":[` +
 		`{"type":"reasoning","encrypted_content":"foreign-signature","summary":[]},` +
 		`{"role":"user","content":[{"type":"input_text","text":"hi"}]}]}`
 	recorder := httptest.NewRecorder()
@@ -198,7 +198,7 @@ func TestChatCompletionsNonStreamingAcceptsIncompleteResponse(t *testing.T) {
 			Type: "response.incomplete",
 			Raw: map[string]any{"response": map[string]any{
 				"id":                 "resp_chat_incomplete",
-				"model":              "gpt-5.4",
+				"model":              "gpt-5.6-terra",
 				"status":             "incomplete",
 				"incomplete_details": map[string]any{"reason": "max_output_tokens"},
 				"output_text":        "partial answer",
@@ -210,7 +210,7 @@ func TestChatCompletionsNonStreamingAcceptsIncompleteResponse(t *testing.T) {
 	recorder := httptest.NewRecorder()
 	ctx, _ := gin.CreateTestContext(recorder)
 	ctx.Request = httptest.NewRequest(http.MethodPost, "/v1/chat/completions", strings.NewReader(`{
-		"model":"gpt-5.4","messages":[{"role":"user","content":"hello"}]
+		"model":"gpt-5.6-terra","messages":[{"role":"user","content":"hello"}]
 	}`))
 	app.handleChatCompletions(ctx)
 
@@ -243,7 +243,7 @@ func TestResponsesNonStreamingPreservesIncompleteResponse(t *testing.T) {
 			Type: "response.incomplete",
 			Raw: map[string]any{"response": map[string]any{
 				"id":                 "resp_responses_incomplete",
-				"model":              "gpt-5.4",
+				"model":              "gpt-5.6-terra",
 				"status":             "incomplete",
 				"incomplete_details": map[string]any{"reason": "content_filter"},
 				"output_text":        "safe partial",
@@ -254,7 +254,7 @@ func TestResponsesNonStreamingPreservesIncompleteResponse(t *testing.T) {
 	recorder := httptest.NewRecorder()
 	ctx, _ := gin.CreateTestContext(recorder)
 	ctx.Request = httptest.NewRequest(http.MethodPost, "/v1/responses", strings.NewReader(`{
-		"model":"gpt-5.4","input":"hello"
+		"model":"gpt-5.6-terra","input":"hello"
 	}`))
 	app.handleResponses(ctx)
 
@@ -284,7 +284,7 @@ func TestOpenStreamAttemptsEachAccountOnlyOnce(t *testing.T) {
 		return nil, &codex.UpstreamError{Op: "codex response", StatusCode: http.StatusServiceUnavailable}
 	}
 
-	account, _, _, err := app.openStream(nil, context.Background(), "responses", &sessionResolution{Request: turn.NormalizedRequest{Request: codex.Request{Model: "gpt-5.4"}, ModelExplicit: true}})
+	account, _, _, err := app.openStream(nil, context.Background(), "responses", &sessionResolution{Request: turn.NormalizedRequest{Request: codex.Request{Model: "gpt-5.6-terra"}, ModelExplicit: true}})
 	if err == nil {
 		t.Fatal("openStream() error = nil, want upstream error")
 	}
@@ -306,7 +306,7 @@ func TestOpenStreamDoesNotFailOverNonRetryableRequestError(t *testing.T) {
 		return nil, &codex.UpstreamError{Op: "codex response", StatusCode: http.StatusBadRequest}
 	}
 
-	_, _, _, err := app.openStream(nil, context.Background(), "responses", &sessionResolution{Request: turn.NormalizedRequest{Request: codex.Request{Model: "gpt-5.4"}, ModelExplicit: true}})
+	_, _, _, err := app.openStream(nil, context.Background(), "responses", &sessionResolution{Request: turn.NormalizedRequest{Request: codex.Request{Model: "gpt-5.6-terra"}, ModelExplicit: true}})
 	if err == nil {
 		t.Fatal("openStream() error = nil, want upstream error")
 	}
@@ -329,7 +329,7 @@ func TestOpenStreamDoesNotFailOverAfterRequestCancellation(t *testing.T) {
 		}, nil
 	}
 
-	_, _, _, err := app.openStream(nil, ctx, "responses", &sessionResolution{Request: turn.NormalizedRequest{Request: codex.Request{Model: "gpt-5.4", Stream: true}, ModelExplicit: true}})
+	_, _, _, err := app.openStream(nil, ctx, "responses", &sessionResolution{Request: turn.NormalizedRequest{Request: codex.Request{Model: "gpt-5.6-terra", Stream: true}, ModelExplicit: true}})
 	if !errors.Is(err, context.Canceled) {
 		t.Fatalf("openStream() error = %v, want context.Canceled", err)
 	}
@@ -349,7 +349,7 @@ func TestOpenStreamKeepsExplicitContinuationPinned(t *testing.T) {
 	}
 
 	account, _, _, err := app.openStream(nil, context.Background(), "responses", &sessionResolution{
-		Request:            turn.NormalizedRequest{Request: codex.Request{Model: "gpt-5.4", PreviousResponseID: "resp_1"}, ModelExplicit: true},
+		Request:            turn.NormalizedRequest{Request: codex.Request{Model: "gpt-5.6-terra", PreviousResponseID: "resp_1"}, ModelExplicit: true},
 		PreferredAccountID: "acct-a",
 		ExplicitPrevious:   true,
 	})
@@ -376,10 +376,10 @@ func TestOpenStreamReplaysExplicitHTTPContinuation(t *testing.T) {
 
 	resolution := sessionResolution{
 		Request: turn.NormalizedRequest{Request: codex.Request{
-			Model: "gpt-5.4", PreviousResponseID: "resp_1", Input: []codex.InputItem{userText("second")},
+			Model: "gpt-5.6-terra", PreviousResponseID: "resp_1", Input: []codex.InputItem{userText("second")},
 		}, ModelExplicit: true},
 		Original: turn.NormalizedRequest{Request: codex.Request{
-			Model: "gpt-5.4", Input: []codex.InputItem{userText("first"), assistantText("first answer"), userText("second")},
+			Model: "gpt-5.6-terra", Input: []codex.InputItem{userText("first"), assistantText("first answer"), userText("second")},
 		}, ModelExplicit: true},
 		PreferredAccountID: "acct-a",
 		ExplicitPrevious:   true,
@@ -445,7 +445,7 @@ func TestNormalizeChatCompletionsBodyAcceptsResponsesShape(t *testing.T) {
 	t.Parallel()
 
 	body := []byte(`{
-		"model": "gpt-5.4",
+		"model": "gpt-5.6-terra",
 		"instructions": "Be concise.",
 		"input": {
 			"role": "user",
@@ -506,7 +506,7 @@ func TestNormalizeChatCompletionsBodyLiftsInstructionRolesFromResponsesShape(t *
 	t.Parallel()
 
 	body := []byte(`{
-		"model": "gpt-5.4",
+		"model": "gpt-5.6-terra",
 		"input": [
 			{"role": "system", "content": "You are GPT-5.4."},
 			{"role": "user", "content": "Explain this repository."},
@@ -545,7 +545,7 @@ func TestNormalizeChatCompletionsBodyAcceptsArrayToolOutputInResponsesShape(t *t
 	t.Parallel()
 
 	body := []byte(`{
-		"model": "gpt-5.4",
+		"model": "gpt-5.6-terra",
 		"input": [
 			{"role": "assistant", "type": "function_call", "call_id": "call_1", "name": "Glob", "arguments": "{\"glob_pattern\":\"README*\"}"},
 			{"type": "function_call_output", "call_id": "call_1", "output": [
@@ -582,7 +582,7 @@ func TestNormalizeChatCompletionsBodyPrefersMessagesShape(t *testing.T) {
 	t.Parallel()
 
 	body := []byte(`{
-		"model": "gpt-5.4",
+		"model": "gpt-5.6-terra",
 		"messages": [{"role": "user", "content": "hello"}],
 		"instructions": "ignored",
 		"input": {"role": "user", "content": [{"type": "text", "text": "ignored"}]}
@@ -707,7 +707,7 @@ func TestStreamChatCompletionClassifiesStructuredRateLimitFailureAndSetsCooldown
 
 	app.streamChatCompletion(ctx, record, turn.NormalizedRequest{
 		Request: codex.Request{
-			Model:  "gpt-5.4",
+			Model:  "gpt-5.6-terra",
 			Stream: true,
 		},
 	}, stream)
@@ -786,7 +786,7 @@ func TestStreamResponsesClassifiesStructuredQuotaFailureAndSetsCooldown(t *testi
 
 	app.streamResponses(ctx, record, turn.NormalizedRequest{
 		Request: codex.Request{
-			Model:  "gpt-5.4",
+			Model:  "gpt-5.6-terra",
 			Stream: true,
 		},
 	}, stream)
@@ -853,7 +853,7 @@ func TestStreamResponsesClassifiesStructuredUnauthorizedFailure(t *testing.T) {
 
 	app.streamResponses(ctx, record, turn.NormalizedRequest{
 		Request: codex.Request{
-			Model:  "gpt-5.4",
+			Model:  "gpt-5.6-terra",
 			Stream: true,
 		},
 	}, stream)
@@ -921,7 +921,7 @@ func TestStreamResponsesSynthesizesFunctionCallLifecycle(t *testing.T) {
 				Raw: map[string]any{
 					"response": map[string]any{
 						"id":     "resp_tool",
-						"model":  "gpt-5.4",
+						"model":  "gpt-5.6-terra",
 						"status": "completed",
 						"output": []any{
 							map[string]any{
@@ -946,7 +946,7 @@ func TestStreamResponsesSynthesizesFunctionCallLifecycle(t *testing.T) {
 
 	app.streamResponses(ctx, record, turn.NormalizedRequest{
 		Request: codex.Request{
-			Model:  "gpt-5.4",
+			Model:  "gpt-5.6-terra",
 			Stream: true,
 		},
 	}, stream)
@@ -1039,7 +1039,7 @@ func TestStreamResponsesSynthesizesFunctionCallLifecycleWithoutDeltas(t *testing
 				Raw: map[string]any{
 					"response": map[string]any{
 						"id":     "resp_done_only",
-						"model":  "gpt-5.4",
+						"model":  "gpt-5.6-terra",
 						"status": "completed",
 					},
 				},
@@ -1049,7 +1049,7 @@ func TestStreamResponsesSynthesizesFunctionCallLifecycleWithoutDeltas(t *testing
 
 	app.streamResponses(ctx, record, turn.NormalizedRequest{
 		Request: codex.Request{
-			Model:  "gpt-5.4",
+			Model:  "gpt-5.6-terra",
 			Stream: true,
 		},
 	}, stream)
@@ -1107,7 +1107,7 @@ func TestStreamResponsesTextOnlyPassthroughRemainsUnchanged(t *testing.T) {
 				Raw: map[string]any{
 					"response": map[string]any{
 						"id":          "resp_text",
-						"model":       "gpt-5.4",
+						"model":       "gpt-5.6-terra",
 						"status":      "completed",
 						"output_text": "hello",
 					},
@@ -1118,7 +1118,7 @@ func TestStreamResponsesTextOnlyPassthroughRemainsUnchanged(t *testing.T) {
 
 	app.streamResponses(ctx, record, turn.NormalizedRequest{
 		Request: codex.Request{
-			Model:  "gpt-5.4",
+			Model:  "gpt-5.6-terra",
 			Stream: true,
 		},
 	}, stream)

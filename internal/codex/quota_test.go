@@ -168,3 +168,15 @@ func TestQuotaFromUsageResponseIncludesCodeReviewRateLimit(t *testing.T) {
 		t.Fatal("expected code review limit_reached")
 	}
 }
+
+func TestUsageResponseDecodesCreditBalance(t *testing.T) {
+	t.Parallel()
+	var usage UsageResponse
+	if err := json.Unmarshal([]byte(`{"plan_type":"pro","rate_limit":{"allowed":true,"limit_reached":false},"credits":{"has_credits":true,"unlimited":false,"balance":"12.50"}}`), &usage); err != nil {
+		t.Fatal(err)
+	}
+	quota := QuotaFromUsageResponse(usage)
+	if quota.Credits == nil || quota.Credits.Balance == nil || *quota.Credits.Balance != 12.5 {
+		t.Fatalf("credit balance lost: %#v", quota.Credits)
+	}
+}

@@ -8,6 +8,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 
+	"chatgpt-codex-proxy/internal/codex"
 	"chatgpt-codex-proxy/internal/config"
 	"chatgpt-codex-proxy/internal/models"
 )
@@ -20,7 +21,7 @@ func TestHandleModelsIncludesCreatedTimestamp(t *testing.T) {
 	ctx, _ := gin.CreateTestContext(recorder)
 	ctx.Request = httptest.NewRequest(http.MethodGet, "/v1/models", nil)
 
-	app := &App{cfg: config.Config{DefaultModel: "gpt-5.4"}}
+	app := &App{cfg: config.Config{DefaultModel: "gpt-5.6-terra"}}
 	app.handleModels(ctx)
 
 	if recorder.Code != http.StatusOK {
@@ -41,6 +42,28 @@ func TestHandleModelsIncludesCreatedTimestamp(t *testing.T) {
 	}
 }
 
+func TestCodexClientModelsPreservesFetchedAstraLimits(t *testing.T) {
+	t.Parallel()
+	var backend struct {
+		Models []codex.BackendModelEntry `json:"models"`
+	}
+	if err := json.Unmarshal([]byte(`{"models":[{
+		"slug":"gpt-6-astra","context_window":300000,"max_context_window":900000,
+		"default_reasoning_level":"low",
+		"supported_reasoning_levels":[{"effort":"low"},{"effort":"ultra"}]
+	}]}`), &backend); err != nil {
+		t.Fatal(err)
+	}
+	response := codexClientModelsResponse(models.NormalizeBackendEntries(backend.Models))
+	entry := response["models"].([]map[string]any)[0]
+	if entry["slug"] != "gpt-6-astra" || entry["context_window"] != 300000 || entry["max_context_window"] != 900000 {
+		t.Fatalf("Codex client metadata = %#v", entry)
+	}
+	if entry["default_reasoning_level"] != "low" || len(entry["supported_reasoning_levels"].([]map[string]any)) != 2 {
+		t.Fatalf("Codex client reasoning metadata = %#v", entry)
+	}
+}
+
 func TestHandleModelsIncludesCodexImageModels(t *testing.T) {
 	t.Parallel()
 
@@ -49,7 +72,7 @@ func TestHandleModelsIncludesCodexImageModels(t *testing.T) {
 	ctx, _ := gin.CreateTestContext(recorder)
 	ctx.Request = httptest.NewRequest(http.MethodGet, "/v1/models", nil)
 
-	app := &App{cfg: config.Config{DefaultModel: "gpt-5.4"}}
+	app := &App{cfg: config.Config{DefaultModel: "gpt-5.6-terra"}}
 	app.handleModels(ctx)
 
 	var body struct {
@@ -77,7 +100,7 @@ func TestHandleModelsReturnsCodexClientMetadata(t *testing.T) {
 	ctx, _ := gin.CreateTestContext(recorder)
 	ctx.Request = httptest.NewRequest(http.MethodGet, "/v1/models?client_version=0.98.0", nil)
 
-	app := &App{cfg: config.Config{DefaultModel: "gpt-5.4"}}
+	app := &App{cfg: config.Config{DefaultModel: "gpt-5.6-terra"}}
 	app.handleModels(ctx)
 
 	var body struct {
@@ -109,7 +132,7 @@ func TestHandleModelByID(t *testing.T) {
 	}{
 		{
 			name:       "returns supported model",
-			modelID:    "gpt-5.4",
+			modelID:    "gpt-5.6-terra",
 			wantStatus: http.StatusOK,
 			assertBody: func(t *testing.T, bodyBytes []byte) {
 				t.Helper()
@@ -118,8 +141,8 @@ func TestHandleModelByID(t *testing.T) {
 				if err := json.Unmarshal(bodyBytes, &body); err != nil {
 					t.Fatalf("json.Unmarshal() error = %v", err)
 				}
-				if body["id"] != "gpt-5.4" {
-					t.Fatalf("id = %#v, want gpt-5.4", body["id"])
+				if body["id"] != "gpt-5.6-terra" {
+					t.Fatalf("id = %#v, want gpt-5.6-terra", body["id"])
 				}
 				if body["created"] != float64(modelCreatedTimestamp) {
 					t.Fatalf("created = %#v, want %d", body["created"], modelCreatedTimestamp)
@@ -170,7 +193,7 @@ func TestHandleModelByID(t *testing.T) {
 			ctx.Request = httptest.NewRequest(http.MethodGet, "/v1/models/"+tc.modelID, nil)
 			ctx.Params = gin.Params{{Key: "model_id", Value: tc.modelID}}
 
-			app := &App{cfg: config.Config{DefaultModel: "gpt-5.4"}}
+			app := &App{cfg: config.Config{DefaultModel: "gpt-5.6-terra"}}
 			app.handleModelByID(ctx)
 
 			if recorder.Code != tc.wantStatus {
@@ -190,13 +213,13 @@ func TestHandleModelsUsesRuntimeCatalog(t *testing.T) {
 	ctx.Request = httptest.NewRequest(http.MethodGet, "/v1/models", nil)
 
 	catalog := models.NewCatalog(models.BootstrapEntries())
-	catalog.ApplyRouteModels("plan:plus", []models.Entry{{
+	catalog.ApplyRouteModels("acct:acct_plus", []models.Entry{{
 		ID:        "gpt-dynamic-test",
 		IsDefault: true,
 	}})
 
 	app := &App{
-		cfg:    config.Config{DefaultModel: "gpt-5.4"},
+		cfg:    config.Config{DefaultModel: "gpt-5.6-terra"},
 		models: catalog,
 	}
 	app.handleModels(ctx)

@@ -1,18 +1,16 @@
-package server
+package codex
 
 import (
-	"encoding/json"
 	"fmt"
 	"net/http"
-	"strconv"
 	"strings"
 	"time"
 
-	"chatgpt-codex-proxy/internal/codex"
 	"chatgpt-codex-proxy/internal/jsonutil"
 )
 
-func upstreamEventError(event *codex.StreamEvent) error {
+// StreamEventError translates upstream failure events for all response consumers.
+func StreamEventError(event *StreamEvent) error {
 	if event == nil {
 		return nil
 	}
@@ -26,7 +24,7 @@ func upstreamEventError(event *codex.StreamEvent) error {
 	return details
 }
 
-func extractUpstreamEventDetails(event *codex.StreamEvent) *codex.UpstreamError {
+func extractUpstreamEventDetails(event *StreamEvent) *UpstreamError {
 	if event == nil || event.Raw == nil {
 		return nil
 	}
@@ -53,7 +51,7 @@ func extractUpstreamEventDetails(event *codex.StreamEvent) *codex.UpstreamError 
 	)
 	statusCode := 0
 	for _, value := range []any{nested["status_code"], nested["status"], event.Raw["status_code"], event.Raw["status"]} {
-		if parsed, ok := serverIntValue(value); ok {
+		if parsed, ok := jsonutil.IntValue(value); ok {
 			statusCode = parsed
 			break
 		}
@@ -62,7 +60,7 @@ func extractUpstreamEventDetails(event *codex.StreamEvent) *codex.UpstreamError 
 		statusCode = upstreamStatusCodeFromCode(code)
 	}
 
-	return &codex.UpstreamError{
+	return &UpstreamError{
 		Op:         "codex stream",
 		StatusCode: statusCode,
 		Body:       message,
@@ -99,10 +97,10 @@ func firstRetryAfterSeconds(values ...map[string]any) int {
 		if value == nil {
 			continue
 		}
-		if seconds, ok := serverIntValue(value["resets_in_seconds"]); ok && seconds > 0 {
+		if seconds, ok := jsonutil.IntValue(value["resets_in_seconds"]); ok && seconds > 0 {
 			return seconds
 		}
-		if resetAt, ok := serverIntValue(value["resets_at"]); ok && resetAt > 0 {
+		if resetAt, ok := jsonutil.IntValue(value["resets_at"]); ok && resetAt > 0 {
 			diff := resetAt - int(now.Unix())
 			if diff > 0 {
 				return diff
@@ -110,32 +108,4 @@ func firstRetryAfterSeconds(values ...map[string]any) int {
 		}
 	}
 	return 0
-}
-
-func serverIntValue(value any) (int, bool) {
-	switch typed := value.(type) {
-	case int:
-		return typed, true
-	case int32:
-		return int(typed), true
-	case int64:
-		return int(typed), true
-	case float64:
-		return int(typed), true
-	case json.Number:
-		parsed, err := typed.Int64()
-		if err == nil {
-			return int(parsed), true
-		}
-		floatValue, floatErr := typed.Float64()
-		if floatErr == nil {
-			return int(floatValue), true
-		}
-		return 0, false
-	case string:
-		parsed, err := strconv.Atoi(strings.TrimSpace(typed))
-		return parsed, err == nil
-	default:
-		return 0, false
-	}
 }

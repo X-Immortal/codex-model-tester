@@ -9,7 +9,7 @@ func TestChatCompletionsTranslationAcceptsLegacyFunctionsAndChoice(t *testing.T)
 	t.Parallel()
 
 	request := ChatCompletionsRequest{
-		Model: "gpt-5.4",
+		Model: "gpt-5.6-terra",
 		Messages: []ChatMessage{{
 			Role:    "user",
 			Content: MessageContent{{Type: "text", Text: "Call the function"}},
@@ -49,7 +49,7 @@ func TestChatCompletionsTranslationPrefersModernToolsAndToolChoice(t *testing.T)
 	}
 
 	request := ChatCompletionsRequest{
-		Model: "gpt-5.4",
+		Model: "gpt-5.6-terra",
 		Messages: []ChatMessage{{
 			Role:    "user",
 			Content: MessageContent{{Type: "text", Text: "Use the tool"}},
@@ -88,7 +88,7 @@ func TestChatCompletionsTranslationSupportsJSONObject(t *testing.T) {
 	t.Parallel()
 
 	request := ChatCompletionsRequest{
-		Model: "gpt-5.4",
+		Model: "gpt-5.6-terra",
 		Messages: []ChatMessage{{
 			Role:    "user",
 			Content: MessageContent{{Type: "text", Text: "Return JSON"}},
@@ -106,11 +106,11 @@ func TestChatCompletionsTranslationSupportsJSONObject(t *testing.T) {
 	}
 }
 
-func TestChatCompletionsTranslationPreparesSchemaAndWarnings(t *testing.T) {
+func TestChatCompletionsTranslationPreparesSchema(t *testing.T) {
 	t.Parallel()
 
 	request := ChatCompletionsRequest{
-		Model: "gpt-5.4",
+		Model: "gpt-5.6-terra",
 		Messages: []ChatMessage{{
 			Role:    "user",
 			Content: MessageContent{{Type: "text", Text: "Return structured data"}},
@@ -162,11 +162,11 @@ func TestChatCompletionsTranslationPreparesSchemaAndWarnings(t *testing.T) {
 	}
 }
 
-func TestResponsesTranslationPreparesSchemaAndWarnings(t *testing.T) {
+func TestResponsesTranslationPreparesSchema(t *testing.T) {
 	t.Parallel()
 
 	request := ResponsesRequest{
-		Model: "gpt-5.4",
+		Model: "gpt-5.6-terra",
 		Input: ResponsesInput{
 			Items: []ResponsesInputItem{{
 				Role: "user",

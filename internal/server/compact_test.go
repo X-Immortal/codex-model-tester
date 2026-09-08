@@ -71,13 +71,14 @@ func TestHandleResponsesCompactRejectsUnsupportedModel(t *testing.T) {
 	assertOpenAIErrorCode(t, recorder.Body.Bytes(), "model_not_found")
 }
 
-func TestHandleResponsesCompactWrapsBareOutput(t *testing.T) {
+func TestHandleResponsesCompactReturnsCompactedWindow(t *testing.T) {
 	t.Parallel()
 
 	var received codex.CompactRequest
 	app := newCompactTestApp(t, func(ctx context.Context, record accounts.Record, req codex.CompactRequest) (codex.CompactResponse, *accounts.QuotaSnapshot, error) {
 		received = req
 		return codex.CompactResponse{
+			ID: "resp_compact", Object: "response.compaction", CreatedAt: 123,
 			Output: []map[string]any{{
 				"type":              "compaction",
 				"id":                "cmp_1",
@@ -106,6 +107,9 @@ func TestHandleResponsesCompactWrapsBareOutput(t *testing.T) {
 	}
 	if got := body["object"]; got != "response.compaction" {
 		t.Fatalf("object = %#v, want response.compaction", got)
+	}
+	if body["id"] != "resp_compact" || body["created_at"] != float64(123) {
+		t.Fatalf("response metadata = %#v", body)
 	}
 	output, _ := body["output"].([]any)
 	if len(output) != 1 {
@@ -162,7 +166,7 @@ func TestHandleResponsesCompactPreservesUsageAndExpandsPreviousResponse(t *testi
 	app.continuations.Put(conversation.ContinuationRecord{
 		ResponseID: "resp_prev_compact",
 		AccountID:  "acct_compact",
-		Model:      "gpt-5.4",
+		Model:      "gpt-5.6-terra",
 		InputHistory: []turn.InputItem{{
 			Role:  "assistant",
 			Type:  "message",
@@ -188,8 +192,8 @@ func TestHandleResponsesCompactPreservesUsageAndExpandsPreviousResponse(t *testi
 	if recorder.Code != http.StatusOK {
 		t.Fatalf("status = %d, want 200; body=%s", recorder.Code, recorder.Body.String())
 	}
-	if received.Model != "gpt-5.4" {
-		t.Fatalf("model = %q, want gpt-5.4", received.Model)
+	if received.Model != "gpt-5.6-terra" {
+		t.Fatalf("model = %q, want gpt-5.6-terra", received.Model)
 	}
 	if len(received.Input) != 2 {
 		t.Fatalf("len(input) = %d, want 2", len(received.Input))
@@ -247,7 +251,7 @@ func newCompactTestApp(t *testing.T, caller func(context.Context, accounts.Recor
 	cfg := config.Config{
 		ProxyAPIKey:     "test-key",
 		CodexBaseURL:    "https://example.invalid",
-		DefaultModel:    "gpt-5.4",
+		DefaultModel:    "gpt-5.6-terra",
 		ContinuationTTL: time.Minute,
 		RequestTimeout:  5 * time.Second,
 	}

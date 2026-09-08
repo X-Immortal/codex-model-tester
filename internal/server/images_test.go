@@ -612,3 +612,38 @@ func newImagesTestApp(t *testing.T, opener func(turn.NormalizedRequest) eventStr
 	app.routes()
 	return app
 }
+
+func TestImageStreamingConvertsUpstreamJSON(t *testing.T) {
+	t.Parallel()
+	for _, tc := range []struct{ path, payload, prefix string }{
+		{"/v1/images/generations", `{"prompt":"blue square","stream":true}`, "image_generation"},
+		{"/v1/images/edits", `{"prompt":"blue square","stream":true,"images":[{"image_url":"data:image/png;base64,cG5n"}]}`, "image_edit"},
+	} {
+		t.Run(tc.path, func(t *testing.T) {
+			app := newImagesTestApp(t, nil)
+			app.directImageOpen = func(context.Context, accounts.Record, string, []byte, bool) (*http.Response, error) {
+				return &http.Response{Header: http.Header{"Content-Type": []string{"application/json"}}, Body: io.NopCloser(strings.NewReader(`{"created":123,"size":"1024x1024","quality":"low","usage":{"total_tokens":9},"data":[{"b64_json":"cG5n"},{"b64_json":"cG5nMg=="}]}`))}, nil
+			}
+			req := httptest.NewRequest(http.MethodPost, tc.path, strings.NewReader(tc.payload))
+			req.Header.Set("Authorization", "Bearer test-key")
+			req.Header.Set("Content-Type", "application/json")
+			recorder := httptest.NewRecorder()
+			app.Handler().ServeHTTP(recorder, req)
+			if recorder.Code != 200 || recorder.Header().Get("Content-Type") != "text/event-stream" {
+				t.Fatalf("status=%d content-type=%q", recorder.Code, recorder.Header().Get("Content-Type"))
+			}
+			events := parseSSEEvents(t, recorder.Body.String())
+			if len(events) != 2 {
+				t.Fatalf("events=%d, want 2", len(events))
+			}
+			for i, event := range events {
+				if event.Event != tc.prefix+".completed" || event.Data["type"] != event.Event || event.Data["b64_json"] == nil {
+					t.Fatalf("event %d invalid: %#v", i, event)
+				}
+				if event.Data["created_at"] != float64(123) || event.Data["size"] != "1024x1024" || nestedMapFromAny(event.Data["usage"])["total_tokens"] != float64(9) {
+					t.Fatalf("event metadata lost: %#v", event.Data)
+				}
+			}
+		})
+	}
+}

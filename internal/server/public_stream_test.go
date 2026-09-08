@@ -168,7 +168,7 @@ func TestStreamChatCompletionEndsNormallyOnIncompleteResponse(t *testing.T) {
 			Type: "response.incomplete",
 			Raw: map[string]any{"response": map[string]any{
 				"id":                 "resp_chat_filter",
-				"model":              "gpt-5.4",
+				"model":              "gpt-5.6-terra",
 				"status":             "incomplete",
 				"incomplete_details": map[string]any{"reason": "content_filter"},
 				"output_text":        "partial",
@@ -177,7 +177,7 @@ func TestStreamChatCompletionEndsNormallyOnIncompleteResponse(t *testing.T) {
 	}}
 
 	app.streamChatCompletion(ctx, record, turn.NormalizedRequest{
-		Request: codex.Request{Model: "gpt-5.4", Stream: true},
+		Request: codex.Request{Model: "gpt-5.6-terra", Stream: true},
 	}, stream)
 
 	events := parseSSEEvents(t, recorder.Body.String())
@@ -209,7 +209,7 @@ func TestStreamResponsesPassesThroughIncompleteTerminalEvent(t *testing.T) {
 			Type: "response.incomplete",
 			Raw: map[string]any{"response": map[string]any{
 				"id":                 "resp_responses_limit",
-				"model":              "gpt-5.4",
+				"model":              "gpt-5.6-terra",
 				"status":             "incomplete",
 				"incomplete_details": map[string]any{"reason": "max_output_tokens"},
 				"output_text":        "partial",
@@ -218,7 +218,7 @@ func TestStreamResponsesPassesThroughIncompleteTerminalEvent(t *testing.T) {
 	}}
 
 	app.streamResponses(ctx, record, turn.NormalizedRequest{
-		Request: codex.Request{Model: "gpt-5.4", Stream: true},
+		Request: codex.Request{Model: "gpt-5.6-terra", Stream: true},
 	}, stream)
 
 	events := parseSSEEvents(t, recorder.Body.String())
@@ -280,7 +280,7 @@ func TestStreamChatCompletionEmitsReasoningContentAndStrictUsage(t *testing.T) {
 				Raw: map[string]any{
 					"response": map[string]any{
 						"id":          "resp_chat_reasoning",
-						"model":       "gpt-5.4",
+						"model":       "gpt-5.6-terra",
 						"status":      "completed",
 						"output_text": "Final answer",
 						"usage": map[string]any{
@@ -301,7 +301,7 @@ func TestStreamChatCompletionEmitsReasoningContentAndStrictUsage(t *testing.T) {
 
 	app.streamChatCompletion(ctx, record, turn.NormalizedRequest{
 		Request: codex.Request{
-			Model:     "gpt-5.4",
+			Model:     "gpt-5.6-terra",
 			Stream:    true,
 			Reasoning: &codex.Reasoning{Effort: "high"},
 		},
@@ -388,7 +388,7 @@ func TestStreamChatCompletionDoesNotSynthesizeReasoningContentFromCompletedOutpu
 				Raw: map[string]any{
 					"response": map[string]any{
 						"id":          "resp_chat_reasoning_fallback",
-						"model":       "gpt-5.4",
+						"model":       "gpt-5.6-terra",
 						"status":      "completed",
 						"output_text": "Final answer",
 						"output": []any{
@@ -423,7 +423,7 @@ func TestStreamChatCompletionDoesNotSynthesizeReasoningContentFromCompletedOutpu
 
 	app.streamChatCompletion(ctx, record, turn.NormalizedRequest{
 		Request: codex.Request{
-			Model:     "gpt-5.4",
+			Model:     "gpt-5.6-terra",
 			Stream:    true,
 			Reasoning: &codex.Reasoning{Effort: "high"},
 		},
@@ -511,7 +511,7 @@ func TestStreamChatCompletionUsesToolNameFromOutputItemWhenArgumentEventsOmitIt(
 				Raw: map[string]any{
 					"response": map[string]any{
 						"id":     "resp_chat_tool_name",
-						"model":  "gpt-5.4",
+						"model":  "gpt-5.6-terra",
 						"status": "completed",
 					},
 				},
@@ -521,7 +521,7 @@ func TestStreamChatCompletionUsesToolNameFromOutputItemWhenArgumentEventsOmitIt(
 
 	app.streamChatCompletion(ctx, record, turn.NormalizedRequest{
 		Request: codex.Request{
-			Model:  "gpt-5.4",
+			Model:  "gpt-5.6-terra",
 			Stream: true,
 		},
 	}, stream)
@@ -635,7 +635,7 @@ func TestStreamChatCompletionSupportsCustomToolCalls(t *testing.T) {
 				Raw: map[string]any{
 					"response": map[string]any{
 						"id":     "resp_chat_custom_tool",
-						"model":  "gpt-5.4",
+						"model":  "gpt-5.6-terra",
 						"status": "completed",
 					},
 				},
@@ -645,7 +645,7 @@ func TestStreamChatCompletionSupportsCustomToolCalls(t *testing.T) {
 
 	app.streamChatCompletion(ctx, record, turn.NormalizedRequest{
 		Request: codex.Request{
-			Model:  "gpt-5.4",
+			Model:  "gpt-5.6-terra",
 			Stream: true,
 		},
 	}, stream)
@@ -745,7 +745,7 @@ func TestStreamResponsesPreservesReasoningItemsAndEvents(t *testing.T) {
 				Raw: map[string]any{
 					"response": map[string]any{
 						"id":     "resp_responses_reasoning",
-						"model":  "gpt-5.4",
+						"model":  "gpt-5.6-terra",
 						"status": "completed",
 						"output": []any{
 							map[string]any{
@@ -788,7 +788,7 @@ func TestStreamResponsesPreservesReasoningItemsAndEvents(t *testing.T) {
 
 	app.streamResponses(ctx, record, turn.NormalizedRequest{
 		Request: codex.Request{
-			Model:  "gpt-5.4",
+			Model:  "gpt-5.6-terra",
 			Stream: true,
 		},
 	}, stream)
@@ -836,7 +836,7 @@ func TestContinuationInputHistoryIncludesReasoningReplay(t *testing.T) {
 		Raw: map[string]any{
 			"response": map[string]any{
 				"id":     "resp_continuation_reasoning",
-				"model":  "gpt-5.4",
+				"model":  "gpt-5.6-terra",
 				"status": "completed",
 				"output": []any{
 					map[string]any{

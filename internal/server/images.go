@@ -497,7 +497,7 @@ func imagePartialEventPayload(event *codex.StreamEvent, streamPrefix, responseFo
 		"type":                streamPrefix + ".partial_image",
 		"partial_image_index": 0,
 	}
-	if index, ok := serverIntValue(event.Raw["partial_image_index"]); ok {
+	if index, ok := jsonutil.IntValue(event.Raw["partial_image_index"]); ok {
 		payload["partial_image_index"] = index
 	}
 	if strings.EqualFold(strings.TrimSpace(responseFormat), "url") {
@@ -521,7 +521,7 @@ func imageMIMEType(outputFormat string) string {
 
 func imageCreatedAt(accumulator *turn.Accumulator) int64 {
 	response := jsonutil.MapValue(accumulator.RawFinal, "response")
-	if created, ok := serverIntValue(response["created_at"]); ok && created > 0 {
+	if created, ok := jsonutil.IntValue(response["created_at"]); ok && created > 0 {
 		return int64(created)
 	}
 	return time.Now().UTC().Unix()

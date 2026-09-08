@@ -24,7 +24,8 @@ type AccountManager struct {
 	locks sync.Map
 }
 
-var errAccountNotFound = errors.New("account not found")
+// ErrAccountNotFound indicates that the requested local account does not exist.
+var ErrAccountNotFound = errors.New("account not found")
 
 func NewAccountManager(cfg config.Config, accountsSvc *accounts.Service, oauth *codexauth.OAuthService, httpClient *codex.HTTPClient, modelSupport func(accounts.Record, string) bool) *AccountManager {
 	return &AccountManager{
@@ -106,7 +107,7 @@ func (m *AccountManager) GetUsage(ctx context.Context, id string, cached bool) (
 			return accounts.Record{}, nil, err
 		}
 		if !ok {
-			return accounts.Record{}, nil, fmt.Errorf("account not found")
+			return accounts.Record{}, nil, ErrAccountNotFound
 		}
 		return record, record.CachedQuota, nil
 	}
@@ -161,7 +162,7 @@ func (m *AccountManager) refreshLocked(ctx context.Context, record accounts.Reco
 	}
 	updated, err := m.getRecord(record.ID)
 	if err != nil {
-		if errors.Is(err, errAccountNotFound) {
+		if errors.Is(err, ErrAccountNotFound) {
 			return accounts.Record{}, fmt.Errorf("account %q disappeared after auth update", record.ID)
 		}
 		return accounts.Record{}, err
@@ -175,7 +176,7 @@ func (m *AccountManager) getRecord(id string) (accounts.Record, error) {
 		return accounts.Record{}, err
 	}
 	if !ok {
-		return accounts.Record{}, errAccountNotFound
+		return accounts.Record{}, ErrAccountNotFound
 	}
 	return record, nil
 }

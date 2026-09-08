@@ -2,6 +2,12 @@
 
 This document explains exactly how account rotation works in `chatgpt-codex-proxy` today.
 
+Model availability is fetched and cached per account. Accounts on the same plan
+can have different rollout or
+workspace access, including GPT-6 Astra. Explicit model requests are routed only
+to accounts whose fetched catalog contains that model; until discovery succeeds,
+the bootstrap catalog applies.
+
 It is written to match the current implementation in:
 
 - [internal/accounts/service.go](../internal/accounts/service.go)
@@ -448,7 +454,7 @@ Neither form permanently poisons the account state.
 
 ## Manual Admin Overrides
 
-The admin API can change account state in ways that affect routing.
+The admin API can change account state in ways that affect routing. List, patch, and refresh responses return account metadata without OAuth tokens or cookies.
 
 ### `PATCH /admin/accounts/:account_id`
 

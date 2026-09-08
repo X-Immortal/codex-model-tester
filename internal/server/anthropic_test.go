@@ -47,7 +47,7 @@ func TestAnthropicMessagesNonStreaming(t *testing.T) {
 		}
 		return &fakeEventStream{events: []*codex.StreamEvent{{Type: "response.completed", Raw: map[string]any{
 			"response": map[string]any{
-				"id": "resp_anthropic", "model": "gpt-5.4", "status": "completed", "output_text": "Hi",
+				"id": "resp_anthropic", "model": "gpt-5.6-terra", "status": "completed", "output_text": "Hi",
 				"usage": map[string]any{"input_tokens": 8, "output_tokens": 2},
 			},
 		}}}}, nil
@@ -57,7 +57,7 @@ func TestAnthropicMessagesNonStreaming(t *testing.T) {
 	ctx, _ := gin.CreateTestContext(recorder)
 	ctx.Set(middleware.RequestIDKey, "req_test")
 	ctx.Request = httptest.NewRequest(http.MethodPost, "/v1/messages", strings.NewReader(`{
-		"model":"gpt-5.4","max_tokens":256,"system":"Be brief.",
+		"model":"gpt-5.6-terra","max_tokens":256,"system":"Be brief.",
 		"messages":[{"role":"user","content":"Hello"}]
 	}`))
 	ctx.Request.Header.Set("anthropic-version", "2023-06-01")
@@ -147,7 +147,7 @@ func TestAnthropicMessagesReplaysMissingClaudeToolState(t *testing.T) {
 		if requestNumber == 1 {
 			return &fakeEventStream{events: []*codex.StreamEvent{{Type: "response.completed", Raw: map[string]any{
 				"response": map[string]any{
-					"id": "resp_tool", "model": "gpt-5.4", "status": "completed",
+					"id": "resp_tool", "model": "gpt-5.6-terra", "status": "completed",
 					"output": []any{
 						map[string]any{
 							"type":              "reasoning",
@@ -170,7 +170,7 @@ func TestAnthropicMessagesReplaysMissingClaudeToolState(t *testing.T) {
 		}
 		return &fakeEventStream{events: []*codex.StreamEvent{{Type: "response.completed", Raw: map[string]any{
 			"response": map[string]any{
-				"id": "resp_done", "model": "gpt-5.4", "status": "completed", "output_text": "done",
+				"id": "resp_done", "model": "gpt-5.6-terra", "status": "completed", "output_text": "done",
 				"usage": map[string]any{"input_tokens": 8, "output_tokens": 1},
 			},
 		}}}}, nil
@@ -179,7 +179,7 @@ func TestAnthropicMessagesReplaysMissingClaudeToolState(t *testing.T) {
 	first := httptest.NewRecorder()
 	firstContext, _ := gin.CreateTestContext(first)
 	firstContext.Request = httptest.NewRequest(http.MethodPost, "/v1/messages", strings.NewReader(`{
-		"model":"gpt-5.4","max_tokens":256,
+		"model":"gpt-5.6-terra","max_tokens":256,
 		"messages":[{"role":"user","content":"call lookup"}],
 		"tools":[{"name":"lookup","input_schema":{"type":"object"}}],
 		"thinking":{"type":"enabled","budget_tokens":1024}
@@ -194,7 +194,7 @@ func TestAnthropicMessagesReplaysMissingClaudeToolState(t *testing.T) {
 	second := httptest.NewRecorder()
 	secondContext, _ := gin.CreateTestContext(second)
 	secondContext.Request = httptest.NewRequest(http.MethodPost, "/v1/messages", strings.NewReader(`{
-		"model":"gpt-5.4","max_tokens":256,
+		"model":"gpt-5.6-terra","max_tokens":256,
 		"messages":[{"role":"user","content":[
 			{"type":"tool_result","tool_use_id":"call_1","content":"result"}
 		]}],
@@ -224,7 +224,7 @@ func TestAnthropicMessagesDoesNotReplayToolStateAcrossClaudeCodeAgents(t *testin
 		if requestNumber == 1 {
 			return &fakeEventStream{events: []*codex.StreamEvent{{Type: "response.completed", Raw: map[string]any{
 				"response": map[string]any{
-					"id": "resp_agent_a", "model": "gpt-5.4", "status": "completed",
+					"id": "resp_agent_a", "model": "gpt-5.6-terra", "status": "completed",
 					"output": []any{
 						map[string]any{
 							"type": "function_call", "id": "fc_1", "call_id": "call_1",
@@ -236,7 +236,7 @@ func TestAnthropicMessagesDoesNotReplayToolStateAcrossClaudeCodeAgents(t *testin
 		}
 		return &fakeEventStream{events: []*codex.StreamEvent{{Type: "response.completed", Raw: map[string]any{
 			"response": map[string]any{
-				"id": "resp_agent_b", "model": "gpt-5.4", "status": "completed", "output_text": "unexpected replay",
+				"id": "resp_agent_b", "model": "gpt-5.6-terra", "status": "completed", "output_text": "unexpected replay",
 			},
 		}}}}, nil
 	}
@@ -244,7 +244,7 @@ func TestAnthropicMessagesDoesNotReplayToolStateAcrossClaudeCodeAgents(t *testin
 	first := httptest.NewRecorder()
 	firstContext, _ := gin.CreateTestContext(first)
 	firstContext.Request = httptest.NewRequest(http.MethodPost, "/v1/messages", strings.NewReader(`{
-		"model":"gpt-5.4","max_tokens":256,
+		"model":"gpt-5.6-terra","max_tokens":256,
 		"messages":[{"role":"user","content":"call lookup"}],
 		"tools":[{"name":"lookup","input_schema":{"type":"object"}}]
 	}`))
@@ -259,7 +259,7 @@ func TestAnthropicMessagesDoesNotReplayToolStateAcrossClaudeCodeAgents(t *testin
 	second := httptest.NewRecorder()
 	secondContext, _ := gin.CreateTestContext(second)
 	secondContext.Request = httptest.NewRequest(http.MethodPost, "/v1/messages", strings.NewReader(`{
-		"model":"gpt-5.4","max_tokens":256,
+		"model":"gpt-5.6-terra","max_tokens":256,
 		"messages":[{"role":"user","content":[
 			{"type":"tool_result","tool_use_id":"call_1","content":"result"}
 		]}],
@@ -290,7 +290,7 @@ func TestAnthropicMessagesRetriesOnceWithoutInvalidReasoningState(t *testing.T) 
 		case 1:
 			return &fakeEventStream{events: []*codex.StreamEvent{{Type: "response.completed", Raw: map[string]any{
 				"response": map[string]any{
-					"id": "resp_tool", "model": "gpt-5.4", "status": "completed",
+					"id": "resp_tool", "model": "gpt-5.6-terra", "status": "completed",
 					"output": []any{
 						map[string]any{"type": "reasoning", "encrypted_content": serverTestCodexReasoningSignature()},
 						map[string]any{"type": "function_call", "call_id": "call_1", "name": "lookup", "arguments": `{}`},
@@ -313,7 +313,7 @@ func TestAnthropicMessagesRetriesOnceWithoutInvalidReasoningState(t *testing.T) 
 			}
 			return &fakeEventStream{events: []*codex.StreamEvent{{Type: "response.completed", Raw: map[string]any{
 				"response": map[string]any{
-					"id": "resp_retried", "model": "gpt-5.4", "status": "completed", "output_text": "recovered",
+					"id": "resp_retried", "model": "gpt-5.6-terra", "status": "completed", "output_text": "recovered",
 				},
 			}}}}, nil
 		default:
@@ -325,7 +325,7 @@ func TestAnthropicMessagesRetriesOnceWithoutInvalidReasoningState(t *testing.T) 
 	first := httptest.NewRecorder()
 	firstContext, _ := gin.CreateTestContext(first)
 	firstContext.Request = httptest.NewRequest(http.MethodPost, "/v1/messages", strings.NewReader(`{
-		"model":"gpt-5.4","max_tokens":256,
+		"model":"gpt-5.6-terra","max_tokens":256,
 		"messages":[{"role":"user","content":"call lookup"}],
 		"tools":[{"name":"lookup","input_schema":{"type":"object"}}],
 		"thinking":{"type":"enabled","budget_tokens":1024}
@@ -337,7 +337,7 @@ func TestAnthropicMessagesRetriesOnceWithoutInvalidReasoningState(t *testing.T) 
 	second := httptest.NewRecorder()
 	secondContext, _ := gin.CreateTestContext(second)
 	secondContext.Request = httptest.NewRequest(http.MethodPost, "/v1/messages", strings.NewReader(`{
-		"model":"gpt-5.4","max_tokens":256,
+		"model":"gpt-5.6-terra","max_tokens":256,
 		"messages":[{"role":"user","content":[
 			{"type":"tool_result","tool_use_id":"call_1","content":"result"}
 		]}],
@@ -362,11 +362,11 @@ func TestAnthropicMessagesStreamingUsesNamedEventsWithoutDoneSentinel(t *testing
 	app := newFailoverTestApp(t)
 	app.httpStream = func(_ context.Context, _ accounts.Record, _ codex.Request, _ string) (eventStream, error) {
 		return &fakeEventStream{events: []*codex.StreamEvent{
-			{Type: "response.created", Raw: map[string]any{"response": map[string]any{"id": "resp_stream", "model": "gpt-5.4"}}},
+			{Type: "response.created", Raw: map[string]any{"response": map[string]any{"id": "resp_stream", "model": "gpt-5.6-terra"}}},
 			{Type: "response.output_text.delta", Raw: map[string]any{"delta": "Hello"}},
 			{Type: "response.output_text.done", Raw: map[string]any{"text": "Hello"}},
 			{Type: "response.completed", Raw: map[string]any{"response": map[string]any{
-				"id": "resp_stream", "model": "gpt-5.4", "status": "completed", "output_text": "Hello",
+				"id": "resp_stream", "model": "gpt-5.6-terra", "status": "completed", "output_text": "Hello",
 				"usage": map[string]any{"input_tokens": 4, "output_tokens": 1},
 			}}},
 		}}, nil
@@ -374,7 +374,7 @@ func TestAnthropicMessagesStreamingUsesNamedEventsWithoutDoneSentinel(t *testing
 
 	recorder := httptest.NewRecorder()
 	ctx, _ := gin.CreateTestContext(recorder)
-	ctx.Request = httptest.NewRequest(http.MethodPost, "/v1/messages", strings.NewReader(`{"model":"gpt-5.4","max_tokens":256,"stream":true,"messages":[{"role":"user","content":"Hi"}]}`))
+	ctx.Request = httptest.NewRequest(http.MethodPost, "/v1/messages", strings.NewReader(`{"model":"gpt-5.6-terra","max_tokens":256,"stream":true,"messages":[{"role":"user","content":"Hi"}]}`))
 	ctx.Request.Header.Set("anthropic-version", "2023-06-01")
 	app.handleAnthropicMessages(ctx)
 
@@ -397,7 +397,7 @@ func TestAnthropicMessagesNonStreamingAcceptsIncompleteResponse(t *testing.T) {
 			Type: "response.incomplete",
 			Raw: map[string]any{"response": map[string]any{
 				"id":                 "resp_anthropic_limit",
-				"model":              "gpt-5.4",
+				"model":              "gpt-5.6-terra",
 				"status":             "incomplete",
 				"incomplete_details": map[string]any{"reason": "max_output_tokens"},
 				"output_text":        "partial",
@@ -409,7 +409,7 @@ func TestAnthropicMessagesNonStreamingAcceptsIncompleteResponse(t *testing.T) {
 	recorder := httptest.NewRecorder()
 	ctx, _ := gin.CreateTestContext(recorder)
 	ctx.Request = httptest.NewRequest(http.MethodPost, "/v1/messages", strings.NewReader(`{
-		"model":"gpt-5.4","max_tokens":256,"messages":[{"role":"user","content":"Hi"}]
+		"model":"gpt-5.6-terra","max_tokens":256,"messages":[{"role":"user","content":"Hi"}]
 	}`))
 	ctx.Request.Header.Set("anthropic-version", "2023-06-01")
 	app.handleAnthropicMessages(ctx)
@@ -436,12 +436,12 @@ func TestAnthropicMessagesStreamingEndsNormallyOnIncompleteResponse(t *testing.T
 	app := newFailoverTestApp(t)
 	app.httpStream = func(_ context.Context, _ accounts.Record, _ codex.Request, _ string) (eventStream, error) {
 		return &fakeEventStream{events: []*codex.StreamEvent{
-			{Type: "response.created", Raw: map[string]any{"response": map[string]any{"id": "resp_anthropic_filter", "model": "gpt-5.4"}}},
+			{Type: "response.created", Raw: map[string]any{"response": map[string]any{"id": "resp_anthropic_filter", "model": "gpt-5.6-terra"}}},
 			{Type: "response.output_text.delta", Raw: map[string]any{"delta": "partial"}},
 			{Type: "response.output_text.done", Raw: map[string]any{"text": "partial"}},
 			{Type: "response.incomplete", Raw: map[string]any{"response": map[string]any{
 				"id":                 "resp_anthropic_filter",
-				"model":              "gpt-5.4",
+				"model":              "gpt-5.6-terra",
 				"status":             "incomplete",
 				"incomplete_details": map[string]any{"reason": "content_filter"},
 				"output_text":        "partial",
@@ -453,7 +453,7 @@ func TestAnthropicMessagesStreamingEndsNormallyOnIncompleteResponse(t *testing.T
 	recorder := httptest.NewRecorder()
 	ctx, _ := gin.CreateTestContext(recorder)
 	ctx.Request = httptest.NewRequest(http.MethodPost, "/v1/messages", strings.NewReader(`{
-		"model":"gpt-5.4","max_tokens":256,"stream":true,"messages":[{"role":"user","content":"Hi"}]
+		"model":"gpt-5.6-terra","max_tokens":256,"stream":true,"messages":[{"role":"user","content":"Hi"}]
 	}`))
 	ctx.Request.Header.Set("anthropic-version", "2023-06-01")
 	app.handleAnthropicMessages(ctx)
@@ -472,14 +472,14 @@ func TestAnthropicMessagesWritesMidstreamErrorEvent(t *testing.T) {
 	app := newFailoverTestApp(t)
 	app.httpStream = func(_ context.Context, _ accounts.Record, _ codex.Request, _ string) (eventStream, error) {
 		return &fakeEventStream{
-			events:  []*codex.StreamEvent{{Type: "response.created", Raw: map[string]any{"response": map[string]any{"id": "resp_error", "model": "gpt-5.4"}}}},
+			events:  []*codex.StreamEvent{{Type: "response.created", Raw: map[string]any{"response": map[string]any{"id": "resp_error", "model": "gpt-5.6-terra"}}}},
 			tailErr: errors.New("stream disconnected"),
 		}, nil
 	}
 
 	recorder := httptest.NewRecorder()
 	ctx, _ := gin.CreateTestContext(recorder)
-	ctx.Request = httptest.NewRequest(http.MethodPost, "/v1/messages", strings.NewReader(`{"model":"gpt-5.4","max_tokens":256,"stream":true,"messages":[{"role":"user","content":"Hi"}]}`))
+	ctx.Request = httptest.NewRequest(http.MethodPost, "/v1/messages", strings.NewReader(`{"model":"gpt-5.6-terra","max_tokens":256,"stream":true,"messages":[{"role":"user","content":"Hi"}]}`))
 	ctx.Request.Header.Set("anthropic-version", "2023-06-01")
 	app.handleAnthropicMessages(ctx)
 
@@ -501,7 +501,7 @@ func TestAnthropicMessagesDoesNotWriteErrorAfterClientCancellation(t *testing.T)
 		return &fakeEventStream{
 			events: []*codex.StreamEvent{{
 				Type: "response.created",
-				Raw:  map[string]any{"response": map[string]any{"id": "resp_canceled", "model": "gpt-5.4"}},
+				Raw:  map[string]any{"response": map[string]any{"id": "resp_canceled", "model": "gpt-5.6-terra"}},
 			}},
 			beforeTailErr: cancel,
 			tailErr:       errors.New("H3_REQUEST_CANCELLED (local)"),
@@ -510,7 +510,7 @@ func TestAnthropicMessagesDoesNotWriteErrorAfterClientCancellation(t *testing.T)
 
 	recorder := httptest.NewRecorder()
 	ctx, _ := gin.CreateTestContext(recorder)
-	ctx.Request = httptest.NewRequest(http.MethodPost, "/v1/messages", strings.NewReader(`{"model":"gpt-5.4","max_tokens":256,"stream":true,"messages":[{"role":"user","content":"Hi"}]}`)).WithContext(requestContext)
+	ctx.Request = httptest.NewRequest(http.MethodPost, "/v1/messages", strings.NewReader(`{"model":"gpt-5.6-terra","max_tokens":256,"stream":true,"messages":[{"role":"user","content":"Hi"}]}`)).WithContext(requestContext)
 	ctx.Request.Header.Set("anthropic-version", "2023-06-01")
 	app.handleAnthropicMessages(ctx)
 
@@ -563,7 +563,7 @@ func TestAnthropicMessagesKeepsPrestreamFailureAsJSON(t *testing.T) {
 
 	recorder := httptest.NewRecorder()
 	ctx, _ := gin.CreateTestContext(recorder)
-	ctx.Request = httptest.NewRequest(http.MethodPost, "/v1/messages", strings.NewReader(`{"model":"gpt-5.4","max_tokens":256,"stream":true,"messages":[{"role":"user","content":"Hi"}]}`))
+	ctx.Request = httptest.NewRequest(http.MethodPost, "/v1/messages", strings.NewReader(`{"model":"gpt-5.6-terra","max_tokens":256,"stream":true,"messages":[{"role":"user","content":"Hi"}]}`))
 	ctx.Request.Header.Set("anthropic-version", "2023-06-01")
 	app.handleAnthropicMessages(ctx)
 
@@ -611,7 +611,7 @@ func TestAnthropicCountTokensDoesNotOpenUpstream(t *testing.T) {
 	}
 	recorder := httptest.NewRecorder()
 	ctx, _ := gin.CreateTestContext(recorder)
-	ctx.Request = httptest.NewRequest(http.MethodPost, "/v1/messages/count_tokens", strings.NewReader(`{"model":"gpt-5.4","messages":[{"role":"user","content":"Count me"}]}`))
+	ctx.Request = httptest.NewRequest(http.MethodPost, "/v1/messages/count_tokens", strings.NewReader(`{"model":"gpt-5.6-terra","messages":[{"role":"user","content":"Count me"}]}`))
 	ctx.Request.Header.Set("anthropic-version", "2023-06-01")
 	app.handleAnthropicCountTokens(ctx)
 
@@ -656,7 +656,7 @@ func TestAnthropicZeroMaxTokensUsesWebSocketGenerateFalse(t *testing.T) {
 	}
 	fakeStream := &fakeResponsesWebSocketStream{turns: [][]*codex.StreamEvent{{{
 		Type: "response.completed",
-		Raw:  map[string]any{"response": map[string]any{"id": "resp_cached", "model": "gpt-5.4", "status": "completed"}},
+		Raw:  map[string]any{"response": map[string]any{"id": "resp_cached", "model": "gpt-5.6-terra", "status": "completed"}},
 	}}}}
 	app.wsConnector = func(_ context.Context, _ string, _ http.Header, body any) (responsesWebSocketStream, error) {
 		fakeStream.connects++
@@ -668,7 +668,7 @@ func TestAnthropicZeroMaxTokensUsesWebSocketGenerateFalse(t *testing.T) {
 
 	recorder := httptest.NewRecorder()
 	ctx, _ := gin.CreateTestContext(recorder)
-	ctx.Request = httptest.NewRequest(http.MethodPost, "/v1/messages", strings.NewReader(`{"model":"gpt-5.4","max_tokens":0,"messages":[{"role":"user","content":"warm"}]}`))
+	ctx.Request = httptest.NewRequest(http.MethodPost, "/v1/messages", strings.NewReader(`{"model":"gpt-5.6-terra","max_tokens":0,"messages":[{"role":"user","content":"warm"}]}`))
 	ctx.Request.Header.Set("anthropic-version", "2023-06-01")
 	app.handleAnthropicMessages(ctx)
 
@@ -691,7 +691,7 @@ func TestAnthropicHostedWebSearchUsesWebSocketAndMapsResponse(t *testing.T) {
 	fakeStream := &fakeResponsesWebSocketStream{turns: [][]*codex.StreamEvent{{{
 		Type: "response.completed",
 		Raw: map[string]any{"response": map[string]any{
-			"id": "resp_search", "model": "gpt-5.4", "status": "completed",
+			"id": "resp_search", "model": "gpt-5.6-terra", "status": "completed",
 			"output": []any{
 				map[string]any{
 					"type": "web_search_call", "id": "ws_1", "status": "completed",
@@ -716,7 +716,7 @@ func TestAnthropicHostedWebSearchUsesWebSocketAndMapsResponse(t *testing.T) {
 	recorder := httptest.NewRecorder()
 	ctx, _ := gin.CreateTestContext(recorder)
 	ctx.Request = httptest.NewRequest(http.MethodPost, "/v1/messages", strings.NewReader(`{
-		"model":"gpt-5.4",
+		"model":"gpt-5.6-terra",
 		"max_tokens":1024,
 		"messages":[{"role":"user","content":"Search for Codex API"}],
 		"tools":[{

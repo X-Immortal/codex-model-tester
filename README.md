@@ -35,7 +35,7 @@ Built for local and small-scale use.
 
 ## Quick Start
 
-Needs Docker or Go `1.26.x`, and a long random `PROXY_API_KEY`.
+Needs Docker or Go `1.26.8` or later, and a long random `PROXY_API_KEY`.
 
 ```bash
 export PROXY_URL=http://localhost:8080
@@ -59,7 +59,7 @@ Then:
 curl -sS "${PROXY_URL}/v1/chat/completions" \
   -H "Authorization: Bearer ${PROXY_API_KEY}" \
   -H "Content-Type: application/json" \
-  -d '{"model":"gpt-5.6-sol","messages":[{"role":"user","content":"hello"}]}'
+  -d '{"model":"gpt-6-astra","messages":[{"role":"user","content":"hello"}]}'
 ```
 
 ## Clients
@@ -70,10 +70,10 @@ the API key. For Claude Code or another Anthropic client:
 ```bash
 export ANTHROPIC_BASE_URL=http://localhost:8080
 export ANTHROPIC_API_KEY="${PROXY_API_KEY}"
-export ANTHROPIC_MODEL=gpt-5.6-sol
+export ANTHROPIC_MODEL=gpt-6-astra
 ```
 
-Use a model ID from `GET /v1/models` — there are no `claude-*` aliases.
+Use a model ID from `GET /v1/models`; the default is `gpt-6-astra`.
 
 Every route except `GET /health/live` needs the key, as either
 `Authorization: Bearer <key>` or `X-API-Key: <key>`.
@@ -91,7 +91,7 @@ POST /v1/images/edits
 ```
 
 Text, image, and file inputs, reasoning, hosted web search, streaming and
-non-streaming. The model catalog comes from upstream at runtime.
+non-streaming. The model catalog comes from upstream for each account at runtime.
 
 Gotchas:
 
@@ -156,7 +156,6 @@ device logins are memory-only and do not survive a restart.
 
 ```
 POST https://chatgpt.com/backend-api/codex/responses
-POST https://chatgpt.com/backend-api/codex/responses/compact
 GET  https://chatgpt.com/backend-api/codex/usage
 GET  https://chatgpt.com/backend-api/codex/models
 WSS  https://chatgpt.com/backend-api/codex/responses
@@ -172,15 +171,15 @@ chatgpt-codex-proxy/
 ├── internal/
 │   ├── server/               # Gin routing and handlers
 │   ├── openai/ anthropic/    # public protocol adapters
-│   ├── turn/ translate/      # internal turn model and translation
+│   ├── turn/                 # internal turn model and accumulation
 │   ├── codex/ codexauth/     # private upstream client and OAuth
 │   ├── accounts/             # account store
 │   ├── accountmanager/       # rotation, cooldowns, quota routing
 │   ├── devicelogin/          # device-auth onboarding
 │   ├── conversation/         # continuation state and affinity
 │   ├── models/               # runtime model catalog
-│   ├── admin/ middleware/    # admin API and auth
-│   └── store/ config/        # persistence and configuration
+│   ├── middleware/           # authentication and request logging
+│   └── config/               # environment configuration
 ├── test/integration/         # live compatibility suite
 └── docs/                     # upstream and translation references
 ```
@@ -195,7 +194,7 @@ Live tests, against a proxy you already have running:
 
 ```bash
 OPENAI_API_KEY=change-me-to-a-long-random-string \
-OPENAI_MODEL=gpt-5.6-sol \
+OPENAI_MODEL=gpt-6-astra \
 OPENAI_BASE_URL="${PROXY_URL}/v1" \
 go test -tags=live ./test/integration -v -count=1
 ```

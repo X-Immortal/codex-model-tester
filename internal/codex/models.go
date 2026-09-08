@@ -13,6 +13,8 @@ type BackendModelEntry struct {
 	Name                      string                   `json:"name,omitempty"`
 	DisplayName               string                   `json:"display_name,omitempty"`
 	Description               string                   `json:"description,omitempty"`
+	ContextWindow             int                      `json:"context_window,omitempty"`
+	MaxContextWindow          int                      `json:"max_context_window,omitempty"`
 	IsDefault                 bool                     `json:"is_default,omitempty"`
 	DefaultReasoningEffort    string                   `json:"default_reasoning_effort,omitempty"`
 	DefaultReasoningLevel     string                   `json:"default_reasoning_level,omitempty"`

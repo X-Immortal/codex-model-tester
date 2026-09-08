@@ -14,6 +14,45 @@ func testCodexReasoningSignature() string {
 	return testCodexReasoningSignatureWithMarker(0)
 }
 
+func TestAstraThinkingUsesCodexCatalog(t *testing.T) {
+	t.Parallel()
+	catalog := models.NewCatalog(models.BootstrapEntries())
+	for _, effort := range []string{"", "low", "medium", "high", "xhigh", "max", "ultra", "none", "minimal"} {
+		t.Run(effort, func(t *testing.T) {
+			payload, err := json.Marshal(map[string]any{
+				"model": "gpt-6-astra", "max_tokens": 64,
+				"messages":      []map[string]string{{"role": "user", "content": "hello"}},
+				"thinking":      map[string]string{"type": "adaptive"},
+				"output_config": map[string]string{"effort": effort},
+			})
+			if err != nil {
+				t.Fatal(err)
+			}
+			request, err := DecodeMessages(payload)
+			if err != nil {
+				t.Fatal(err)
+			}
+			normalized, err := Normalize(request, catalog)
+			if effort == "none" || effort == "minimal" {
+				if err == nil {
+					t.Fatal("unsupported Astra effort was accepted")
+				}
+				return
+			}
+			if err != nil {
+				t.Fatal(err)
+			}
+			want := effort
+			if want == "" {
+				want = "low"
+			}
+			if normalized.Model != "gpt-6-astra" || normalized.Reasoning == nil || normalized.Reasoning.Effort != want {
+				t.Fatalf("Astra model/effort = %q / %#v", normalized.Model, normalized.Reasoning)
+			}
+		})
+	}
+}
+
 func testCodexReasoningSignatureWithMarker(marker byte) string {
 	payload := make([]byte, 1+8+16+16+32)
 	payload[0] = 0x80
@@ -28,7 +67,7 @@ func TestNormalizeMessagesTextToolsAndThinking(t *testing.T) {
 	t.Parallel()
 
 	request, err := DecodeMessages([]byte(`{
-		"model":"gpt-5.4",
+		"model":"gpt-5.6-terra",
 		"max_tokens":2048,
 		"system":[{"type":"text","text":"Be precise."}],
 		"messages":[
@@ -49,7 +88,7 @@ func TestNormalizeMessagesTextToolsAndThinking(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Normalize() error = %v", err)
 	}
-	if normalized.Model != "gpt-5.4" || normalized.Instructions != "" || !normalized.Stream {
+	if normalized.Model != "gpt-5.6-terra" || normalized.Instructions != "" || !normalized.Stream {
 		t.Fatalf("normalized metadata = %#v", normalized)
 	}
 	if normalized.Reasoning == nil || normalized.Reasoning.Effort != "low" || normalized.Reasoning.Summary != "auto" {
@@ -103,7 +142,7 @@ func TestNormalizeMessagesMapsThinkingBudgetToEffort(t *testing.T) {
 
 			maxTokens := 10
 			normalized, err := Normalize(MessagesRequest{
-				Model:     "gpt-5.4",
+				Model:     "gpt-5.6-terra",
 				MaxTokens: &maxTokens,
 				Messages:  []Message{{Role: "user", Content: Content{{Type: "text", Text: "Think carefully"}}}},
 				Thinking:  &Thinking{Type: "enabled", BudgetTokens: tc.budget},
@@ -150,7 +189,7 @@ func TestNormalizeMessagesPrefersExplicitEffortOverThinkingBudget(t *testing.T) 
 
 	maxTokens := 10
 	normalized, err := Normalize(MessagesRequest{
-		Model:        "gpt-5.4",
+		Model:        "gpt-5.6-terra",
 		MaxTokens:    &maxTokens,
 		Messages:     []Message{{Role: "user", Content: Content{{Type: "text", Text: "Use the requested effort"}}}},
 		Thinking:     &Thinking{Type: "enabled", BudgetTokens: 1024},
@@ -169,7 +208,7 @@ func TestNormalizeMessagesWithoutSystemStaysInstructionFree(t *testing.T) {
 
 	maxTokens := 10
 	normalized, err := Normalize(MessagesRequest{
-		Model:     "gpt-5.4",
+		Model:     "gpt-5.6-terra",
 		MaxTokens: &maxTokens,
 		Messages: []Message{{
 			Role:    "user",
@@ -191,7 +230,7 @@ func TestNormalizeMessagesMapsImagesAndLongToolNames(t *testing.T) {
 	maxTokens := 1
 	disableParallel := false
 	request := MessagesRequest{
-		Model:     "gpt-5.4",
+		Model:     "gpt-5.6-terra",
 		MaxTokens: &maxTokens,
 		Messages: []Message{{Role: "user", Content: Content{
 			{Type: "image", Source: &ImageSource{Type: "base64", MediaType: "image/png", Data: "YWJj"}},
@@ -223,7 +262,7 @@ func TestNormalizeMessagesShortensLongToolUseIDs(t *testing.T) {
 	longID := "toolu_" + strings.Repeat("a", 80)
 	maxTokens := 10
 	normalized, err := Normalize(MessagesRequest{
-		Model:     "gpt-5.4",
+		Model:     "gpt-5.6-terra",
 		MaxTokens: &maxTokens,
 		Messages: []Message{
 			{Role: "assistant", Content: Content{{Type: "tool_use", ID: longID, Name: "lookup", Input: json.RawMessage(`{}`)}}},
@@ -250,7 +289,7 @@ func TestNormalizeMessagesKeepsOnlyValidCodexThinkingSignatures(t *testing.T) {
 
 	maxTokens := 10
 	normalized, err := Normalize(MessagesRequest{
-		Model:     "gpt-5.4",
+		Model:     "gpt-5.6-terra",
 		MaxTokens: &maxTokens,
 		Messages: []Message{
 			{Role: "assistant", Content: Content{
@@ -282,7 +321,7 @@ func TestNormalizeMessagesRejectsUnknownToolResult(t *testing.T) {
 
 	maxTokens := 10
 	_, err := Normalize(MessagesRequest{
-		Model:     "gpt-5.4",
+		Model:     "gpt-5.6-terra",
 		MaxTokens: &maxTokens,
 		Messages:  []Message{{Role: "user", Content: Content{{Type: "tool_result", ToolUseID: "missing", Content: Content{{Type: "text", Text: "nope"}}}}}},
 	}, models.NewCatalog(models.BootstrapEntries()))
@@ -296,7 +335,7 @@ func TestNormalizeMessagesMapsZeroMaxTokensToGenerateFalse(t *testing.T) {
 
 	maxTokens := 0
 	normalized, err := Normalize(MessagesRequest{
-		Model:     "gpt-5.4",
+		Model:     "gpt-5.6-terra",
 		MaxTokens: &maxTokens,
 		Messages:  []Message{{Role: "user", Content: Content{{Type: "text", Text: "warm cache"}}}},
 	}, models.NewCatalog(models.BootstrapEntries()))
@@ -313,7 +352,7 @@ func TestNormalizeMessagesPreservesToolErrorSemantics(t *testing.T) {
 
 	maxTokens := 10
 	normalized, err := Normalize(MessagesRequest{
-		Model:     "gpt-5.4",
+		Model:     "gpt-5.6-terra",
 		MaxTokens: &maxTokens,
 		Messages: []Message{
 			{
@@ -344,7 +383,7 @@ func TestNormalizeMessagesPreservesLargeToolInputNumbers(t *testing.T) {
 
 	maxTokens := 10
 	normalized, err := Normalize(MessagesRequest{
-		Model:     "gpt-5.4",
+		Model:     "gpt-5.6-terra",
 		MaxTokens: &maxTokens,
 		Messages: []Message{{
 			Role: "assistant",
@@ -366,7 +405,7 @@ func TestNormalizeMessagesKeepsThinkingDisabledWhenEffortIsSet(t *testing.T) {
 
 	maxTokens := 10
 	normalized, err := Normalize(MessagesRequest{
-		Model:        "gpt-5.4",
+		Model:        "gpt-5.6-terra",
 		MaxTokens:    &maxTokens,
 		Messages:     []Message{{Role: "user", Content: Content{{Type: "text", Text: "answer"}}}},
 		Thinking:     &Thinking{Type: "disabled"},
@@ -388,7 +427,7 @@ func TestNormalizeMessagesMakesOptionalOutputFieldsStrictAndNullable(t *testing.
 
 	maxTokens := 10
 	normalized, err := Normalize(MessagesRequest{
-		Model:     "gpt-5.4",
+		Model:     "gpt-5.6-terra",
 		MaxTokens: &maxTokens,
 		Messages:  []Message{{Role: "user", Content: Content{{Type: "text", Text: "answer"}}}},
 		OutputConfig: &OutputConfig{Format: &OutputFormat{
@@ -745,7 +784,7 @@ func TestNormalizeMessagesMapsHostedWebSearch(t *testing.T) {
 			t.Parallel()
 
 			request, err := DecodeMessages([]byte(`{
-				"model":"gpt-5.4",
+				"model":"gpt-5.6-terra",
 				"max_tokens":10,
 				"messages":[{"role":"user","content":"search"}],
 				"tools":[{
@@ -798,7 +837,7 @@ func TestNormalizeMessagesReplaysHostedWebSearchBlocks(t *testing.T) {
 	t.Parallel()
 
 	request, err := DecodeMessages([]byte(`{
-		"model":"gpt-5.4",
+		"model":"gpt-5.6-terra",
 		"max_tokens":10,
 		"messages":[
 			{"role":"user","content":"search"},
@@ -847,7 +886,7 @@ func TestNormalizeMessagesRejectsUnsupportedHostedWebSearchLimits(t *testing.T) 
 			t.Parallel()
 
 			_, err := Normalize(MessagesRequest{
-				Model:     "gpt-5.4",
+				Model:     "gpt-5.6-terra",
 				MaxTokens: &maxTokens,
 				Messages:  []Message{{Role: "user", Content: Content{{Type: "text", Text: "search"}}}},
 				Tools:     []Tool{tool},

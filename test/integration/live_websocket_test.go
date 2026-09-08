@@ -28,9 +28,10 @@ func TestLiveResponsesWebSocketContinuation(t *testing.T) {
 	defer conn.Close()
 
 	firstID := runLiveResponsesWebSocketTurn(t, conn, map[string]any{
-		"type":  "response.create",
-		"model": cfg.Model,
-		"input": "Reply with exactly ALPHA.",
+		"type":         "response.create",
+		"model":        cfg.Model,
+		"input":        "Reply with exactly ALPHA.",
+		"service_tier": "auto",
 	})
 	if firstID == "" {
 		t.Fatal("first WebSocket turn returned no response ID")

@@ -107,49 +107,6 @@ func (c *HTTPClient) GetCodexModels(ctx context.Context, record accounts.Record)
 	return models, nil
 }
 
-func (c *HTTPClient) CompactResponse(ctx context.Context, record accounts.Record, req CompactRequest) (CompactResponse, *accounts.QuotaSnapshot, error) {
-	session := c.sessionFor(record.ID)
-	headers := BuildHeaders(record.Token.AccessToken, HeaderOptions{
-		AccountID:      record.AccountID,
-		Cookies:        record.Cookies,
-		ContentType:    "application/json",
-		RequestID:      NewRequestID(),
-		IncludeBeta:    true,
-		Accept:         "application/json",
-		AcceptEncoding: "gzip, deflate",
-	})
-
-	payload, err := json.Marshal(req)
-	if err != nil {
-		return CompactResponse{}, nil, err
-	}
-
-	resp, err := session.Do(ctx, &httpcloak.Request{
-		Method:  http.MethodPost,
-		URL:     JoinURL(c.cfg.CodexBaseURL, "/codex/responses/compact"),
-		Headers: headers,
-		Body:    bytes.NewReader(payload),
-	})
-	if err != nil {
-		return CompactResponse{}, nil, err
-	}
-	defer resp.Close()
-
-	body, err := resp.Text()
-	if err != nil {
-		return CompactResponse{}, nil, err
-	}
-	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
-		return CompactResponse{}, nil, NewUpstreamError("codex compact response", resp.StatusCode, body, CanonicalHeader(resp.Headers))
-	}
-
-	var decoded CompactResponse
-	if err := json.Unmarshal([]byte(body), &decoded); err != nil {
-		return CompactResponse{}, nil, err
-	}
-	return decoded, ParseQuotaFromHeaders(CanonicalHeader(resp.Headers)), nil
-}
-
 func (c *HTTPClient) StreamResponse(ctx context.Context, record accounts.Record, req Request, turnState string) (*StreamReader, error) {
 	session := c.sessionFor(record.ID)
 	headers := BuildHeaders(record.Token.AccessToken, HeaderOptions{

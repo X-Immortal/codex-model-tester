@@ -12,8 +12,8 @@ func TestParseCodexModelsResponseAcceptsLiveShape(t *testing.T) {
 	payload := `{
 		"models": [
 			{
-				"slug": "gpt-5.4",
-				"display_name": "gpt-5.4",
+				"slug": "gpt-5.6-terra",
+				"display_name": "gpt-5.6-terra",
 				"description": "Flagship",
 				"default_reasoning_level": "medium",
 				"supported_reasoning_levels": [
@@ -22,7 +22,7 @@ func TestParseCodexModelsResponseAcceptsLiveShape(t *testing.T) {
 				]
 			},
 			{
-				"slug": "gpt-5.4-mini",
+				"slug": "gpt-5.6-luna",
 				"display_name": "GPT-5.4-Mini",
 				"default_reasoning_level": "medium"
 			}
@@ -36,11 +36,11 @@ func TestParseCodexModelsResponseAcceptsLiveShape(t *testing.T) {
 	if len(models) != 2 {
 		t.Fatalf("len(models) = %d, want 2", len(models))
 	}
-	if models[0].Slug != "gpt-5.4" {
-		t.Fatalf("models[0].Slug = %q, want gpt-5.4", models[0].Slug)
+	if models[0].Slug != "gpt-5.6-terra" {
+		t.Fatalf("models[0].Slug = %q, want gpt-5.6-terra", models[0].Slug)
 	}
-	if models[0].DisplayName != "gpt-5.4" {
-		t.Fatalf("models[0].DisplayName = %q, want gpt-5.4", models[0].DisplayName)
+	if models[0].DisplayName != "gpt-5.6-terra" {
+		t.Fatalf("models[0].DisplayName = %q, want gpt-5.6-terra", models[0].DisplayName)
 	}
 	if models[0].DefaultReasoningLevel != "medium" {
 		t.Fatalf("models[0].DefaultReasoningLevel = %q, want medium", models[0].DefaultReasoningLevel)
@@ -56,19 +56,19 @@ func TestParseCodexModelsResponseRejectsUnsupportedShapes(t *testing.T) {
 	}{
 		{
 			name:    "bare array",
-			payload: `[{"slug":"gpt-5.4"}]`,
+			payload: `[{"slug":"gpt-5.6-terra"}]`,
 		},
 		{
 			name:    "data field",
-			payload: `{"data":[{"slug":"gpt-5.4"}]}`,
+			payload: `{"data":[{"slug":"gpt-5.6-terra"}]}`,
 		},
 		{
 			name:    "chat_models field",
-			payload: `{"chat_models":{"models":[{"slug":"gpt-5.4"}]}}`,
+			payload: `{"chat_models":{"models":[{"slug":"gpt-5.6-terra"}]}}`,
 		},
 		{
 			name:    "categories field",
-			payload: `{"categories":[{"models":[{"slug":"gpt-5.4"}]}]}`,
+			payload: `{"categories":[{"models":[{"slug":"gpt-5.6-terra"}]}]}`,
 		},
 		{
 			name:    "missing models",
@@ -80,7 +80,7 @@ func TestParseCodexModelsResponseRejectsUnsupportedShapes(t *testing.T) {
 		},
 		{
 			name:    "nested models tree",
-			payload: `{"models":[{"models":[{"slug":"gpt-5.4"}]}]}`,
+			payload: `{"models":[{"models":[{"slug":"gpt-5.6-terra"}]}]}`,
 		},
 	}
 
@@ -100,7 +100,7 @@ func TestCodexModelsURL(t *testing.T) {
 	t.Parallel()
 
 	client := NewHTTPClient(config.Config{CodexBaseURL: "https://chatgpt.com/backend-api"})
-	want := "https://chatgpt.com/backend-api/codex/models?client_version=26.707.31428"
+	want := "https://chatgpt.com/backend-api/codex/models?client_version=26.901.51231"
 	if got := client.codexModelsURL(); got != want {
 		t.Fatalf("codexModelsURL() = %q, want %q", got, want)
 	}

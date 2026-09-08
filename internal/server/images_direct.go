@@ -4,7 +4,10 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"io"
+	"maps"
+	"mime"
 	"net/http"
 	"strings"
 
@@ -12,6 +15,8 @@ import (
 
 	"chatgpt-codex-proxy/internal/accounts"
 	"chatgpt-codex-proxy/internal/codex"
+	"chatgpt-codex-proxy/internal/jsonutil"
+	"chatgpt-codex-proxy/internal/turn"
 )
 
 func prepareDirectImagePayload(body []byte, model string, stream bool) ([]byte, error) {
@@ -43,7 +48,36 @@ func (a *App) handleDirectImageResponse(c *gin.Context, endpoint, path string, p
 	a.setRequestAccount(c, account)
 	a.observeQuotaSnapshot(account.ID, codex.ParseQuotaFromHeaders(response.Header))
 	contentType := strings.TrimSpace(response.Header.Get("Content-Type"))
-	if stream {
+	mediaType, _, _ := mime.ParseMediaType(contentType)
+	if stream && mediaType == "application/json" {
+		var body map[string]any
+		err := json.NewDecoder(response.Body).Decode(&body)
+		results := jsonutil.SliceOfMaps(body["data"])
+		if err == nil && len(results) == 0 {
+			err = fmt.Errorf("upstream image response contained no images")
+		}
+		if err != nil {
+			a.handleOpenStreamError(c, endpoint, account.ID, account.ID, err)
+			return true
+		}
+		prefix := "image_generation"
+		if endpoint == "images_edits" {
+			prefix = "image_edit"
+		}
+		delete(body, "data")
+		if created, ok := body["created"]; ok {
+			body["created_at"] = created
+			delete(body, "created")
+		}
+		prepareStreamResponse(c)
+		for _, result := range results {
+			payload := jsonutil.CloneMap(body)
+			maps.Copy(payload, result)
+			payload["type"] = prefix + ".completed"
+			writeSSE(c.Writer, prefix+".completed", turn.MustJSON(payload))
+			c.Writer.Flush()
+		}
+	} else if stream {
 		prepareStreamResponse(c)
 		if contentType != "" {
 			c.Header("Content-Type", contentType)

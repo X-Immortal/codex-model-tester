@@ -20,7 +20,7 @@ import (
 )
 
 const (
-	desktopUserAgent   = "Codex Desktop/26.707.31428 (win32; x64)"
+	desktopUserAgent   = "Codex Desktop/26.901.51231 (win32; x64)"
 	deviceUserCodePath = "/api/accounts/deviceauth/usercode"
 	deviceTokenPath    = "/api/accounts/deviceauth/token"
 	oauthTokenPath     = "/oauth/token"

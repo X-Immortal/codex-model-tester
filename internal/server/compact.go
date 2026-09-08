@@ -3,11 +3,9 @@ package server
 import (
 	"context"
 	"encoding/json"
-	"fmt"
 	"net/http"
 	"slices"
 	"strings"
-	"time"
 
 	"github.com/gin-gonic/gin"
 
@@ -125,15 +123,10 @@ func (a *App) acquireAccountForCompact(ctx context.Context, preferredAccountID s
 }
 
 func compactResponseObject(upstream codex.CompactResponse) map[string]any {
-	createdAt := upstream.CreatedAt
-	if createdAt == 0 {
-		createdAt = time.Now().UTC().Unix()
-	}
-
 	response := map[string]any{
-		"id":         jsonutil.FirstNonEmpty(strings.TrimSpace(upstream.ID), fmt.Sprintf("resp_compact_%d", time.Now().UTC().UnixNano())),
-		"object":     jsonutil.FirstNonEmpty(strings.TrimSpace(upstream.Object), "response.compaction"),
-		"created_at": createdAt,
+		"id":         upstream.ID,
+		"object":     "response.compaction",
+		"created_at": upstream.CreatedAt,
 	}
 	response["output"] = jsonutil.CloneValue(upstream.Output)
 	if len(upstream.Usage) > 0 {

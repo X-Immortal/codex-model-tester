@@ -17,8 +17,8 @@ func TestFormatPayloadForLog(t *testing.T) {
 		},
 		{
 			name:  "map value",
-			value: map[string]any{"stream": true, "model": "gpt-5.4"},
-			want:  "{\"model\":\"gpt-5.4\",\"stream\":true}",
+			value: map[string]any{"stream": true, "model": "gpt-5.6-terra"},
+			want:  "{\"model\":\"gpt-5.6-terra\",\"stream\":true}",
 		},
 	}
 

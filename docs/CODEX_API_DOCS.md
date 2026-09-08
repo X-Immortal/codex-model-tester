@@ -22,7 +22,6 @@ This proxy currently uses two upstream systems:
 The Codex backend endpoints in active use are:
 
 - `POST /codex/responses`
-- `POST /codex/responses/compact`
 - `POST /codex/images/generations`
 - `POST /codex/images/edits`
 - `WSS /codex/responses`
@@ -89,7 +88,7 @@ The proxy intentionally mimics a desktop Codex client. These headers are always 
 Authorization: Bearer <access_token>
 originator: Codex Desktop
 x-openai-internal-codex-residency: us
-User-Agent: Codex Desktop/26.707.31428 (win32; x64)
+User-Agent: Codex Desktop/26.901.51231 (win32; x64)
 sec-ch-ua: "Chromium";v="149", "Not:A-Brand";v="24"
 sec-ch-ua-mobile: ?0
 sec-ch-ua-platform: "Windows"
@@ -126,7 +125,7 @@ This is the canonical request shape the proxy sends to the HTTP Codex responses 
 
 ```json
 {
-  "model": "gpt-5.6-sol",
+  "model": "gpt-6-astra",
   "instructions": "",
   "input": [],
   "stream": true,
@@ -177,11 +176,11 @@ Implementation notes:
 
 ## Compact Request Object
 
-This is the canonical request shape the proxy sends to the JSON compact endpoint.
+This is the canonical compact request accepted by the proxy before transport translation.
 
 ```json
 {
-  "model": "gpt-5.6-sol",
+  "model": "gpt-6-astra",
   "instructions": "Summarize the thread state.",
   "input": [
     {
@@ -225,13 +224,13 @@ Observed fields:
 
 Implementation notes:
 
-- The compact path is plain JSON, not SSE.
-- The compact path does not send `stream`, `store`, or `previous_response_id`.
+- The public compact endpoint returns JSON. Its upstream request uses the Responses SSE transport.
+- The transport appends a `compaction_trigger` input item, sets `stream: true` and `store: false`, and omits `previous_response_id`.
 - If a client supplies `previous_response_id` to the proxy's public compact endpoint, the proxy expands saved history locally before calling upstream.
 
 ## Compact Response Object
 
-Observed top-level response shape accepted by the proxy:
+The proxy returns this compaction response shape:
 
 ```json
 {
@@ -262,8 +261,8 @@ Observed fields:
 
 Implementation notes:
 
-- The proxy treats `output` items as opaque JSON objects.
-- An observed compact output item type is `compaction`.
+- The encrypted `compaction` item is collected from the upstream stream.
+- Replay `output` as the next context window; append the new user message afterward.
 
 ## InputItem
 
@@ -454,7 +453,7 @@ x-openai-internal-codex-residency: us
 x-client-request-id: req_<...>
 x-codex-turn-state: <turn_state>
 OpenAI-Beta: responses_websockets=2026-02-06
-User-Agent: Codex Desktop/26.707.31428 (win32; x64)
+User-Agent: Codex Desktop/26.901.51231 (win32; x64)
 Content-Type: application/json
 Accept: text/event-stream
 ```
@@ -467,7 +466,7 @@ Example:
 
 ```json
 {
-  "model": "gpt-5.6-sol",
+  "model": "gpt-6-astra",
   "instructions": "Be concise.",
   "input": [
     {
@@ -484,7 +483,7 @@ Example with tool calls:
 
 ```json
 {
-  "model": "gpt-5.6-sol",
+  "model": "gpt-6-astra",
   "instructions": "Be concise.",
   "input": [
     {
@@ -528,7 +527,7 @@ curl -sS -N "${CODEX_BASE_URL}/codex/responses" \
   -H "Content-Type: application/json" \
   -H "Accept: text/event-stream" \
   -d '{
-    "model": "gpt-5.6-sol",
+    "model": "gpt-6-astra",
     "instructions": "Be concise.",
     "input": [
       {
@@ -785,7 +784,7 @@ Observed payload:
   "type": "response.completed",
   "response": {
     "id": "resp_123",
-    "model": "gpt-5.6-sol",
+    "model": "gpt-6-astra",
     "status": "completed",
     "output": [],
     "output_text": "final text",
@@ -891,121 +890,6 @@ Fields used by the proxy:
 - same for `secondary`
 - same for `code_review` or `code_review_rate_limit`
 
-## POST /codex/responses/compact
-
-Create a compacted response object over plain JSON HTTP.
-
-### URL
-
-```http
-POST https://chatgpt.com/backend-api/codex/responses/compact
-```
-
-### Headers
-
-Typical request headers:
-
-```http
-Authorization: Bearer <access_token>
-ChatGPT-Account-Id: <account_id>
-originator: Codex Desktop
-x-openai-internal-codex-residency: us
-x-client-request-id: req_<...>
-OpenAI-Beta: responses_websockets=2026-02-06
-User-Agent: Codex Desktop/26.707.31428 (win32; x64)
-Content-Type: application/json
-Accept: application/json
-```
-
-### Request body
-
-The proxy sends the `CompactRequest` object described above.
-
-Example:
-
-```json
-{
-  "model": "gpt-5.6-sol",
-  "input": [
-    {
-      "role": "assistant",
-      "phase": "output",
-      "content": [
-        {
-          "type": "output_text",
-          "text": "Long prior answer"
-        }
-      ]
-    },
-    {
-      "role": "user",
-      "content": "Compact this thread for the next turn."
-    }
-  ]
-}
-```
-
-Example with an existing compaction artifact:
-
-```json
-{
-  "model": "gpt-5.6-sol",
-  "input": [
-    {
-      "type": "compaction",
-      "id": "cmp_existing",
-      "encrypted_content": "enc_existing"
-    },
-    {
-      "role": "user",
-      "content": "Refresh the summary with the latest turn."
-    }
-  ]
-}
-```
-
-```bash
-curl -sS "${CODEX_BASE_URL}/codex/responses/compact" \
-  -H "Authorization: Bearer ${ACCESS_TOKEN}" \
-  -H "ChatGPT-Account-Id: ${ACCOUNT_ID}" \
-  -H "OpenAI-Beta: responses_websockets=2026-02-06" \
-  -H "Content-Type: application/json" \
-  -H "Accept: application/json" \
-  -d '{
-    "model": "gpt-5.6-sol",
-    "input": [
-      {
-        "role": "assistant",
-        "phase": "output",
-        "content": [
-          {
-            "type": "output_text",
-            "text": "Long prior answer"
-          }
-        ]
-      },
-      {
-        "role": "user",
-        "content": "Compact this thread for the next turn."
-      }
-    ]
-  }'
-```
-
-### Response body
-
-The proxy expects a single JSON object and decodes it as the `CompactResponse` object described above.
-
-Observed output item shape:
-
-```json
-{
-  "type": "compaction",
-  "id": "cmp_123",
-  "encrypted_content": "enc"
-}
-```
-
 ## WSS /codex/responses
 
 Create or continue a response stream over websocket.
@@ -1042,7 +926,7 @@ The proxy sends one JSON message immediately after connecting. Persistent public
 ```json
 {
   "type": "response.create",
-  "model": "gpt-5.6-sol",
+  "model": "gpt-6-astra",
   "input": [],
   "instructions": "Be concise.",
   "tools": [],
@@ -1080,7 +964,7 @@ Observed fields:
 - optional `include`
 - optional `generate`
 
-The current WebSocket payload omits the HTTP request fields `stream`, `store`, and `service_tier`.
+The WebSocket payload forwards `service_tier` when supplied, and omits `stream` and `store`.
 
 ### Websocket response messages
 
@@ -1110,7 +994,7 @@ ChatGPT-Account-Id: <account_id>
 originator: Codex Desktop
 x-openai-internal-codex-residency: us
 x-client-request-id: req_<...>
-User-Agent: Codex Desktop/26.707.31428 (win32; x64)
+User-Agent: Codex Desktop/26.901.51231 (win32; x64)
 Accept: application/json
 Accept-Encoding: gzip, deflate
 ```
@@ -1151,7 +1035,7 @@ Observed response shape:
   "credits": {
     "has_credits": true,
     "unlimited": false,
-    "balance": 19.5,
+    "balance": "19.5",
     "active_limit": "plus"
   }
 }
@@ -1169,7 +1053,7 @@ Observed fields:
 - `code_review_rate_limit.primary_window`
 - `credits.has_credits: bool`
 - `credits.unlimited: bool`
-- `credits.balance: number`
+- `credits.balance: string`
 - `credits.active_limit: string`
 
 Usage window fields:
@@ -1193,7 +1077,7 @@ Model-catalog endpoint used by this repository.
 ### URL
 
 ```http
-GET https://chatgpt.com/backend-api/codex/models?client_version=26.707.31428
+GET https://chatgpt.com/backend-api/codex/models?client_version=26.901.51231
 ```
 
 The `client_version` query parameter is currently only attached to `/codex/models`.
@@ -1208,7 +1092,7 @@ ChatGPT-Account-Id: <account_id>
 originator: Codex Desktop
 x-openai-internal-codex-residency: us
 x-client-request-id: req_<...>
-User-Agent: Codex Desktop/26.707.31428 (win32; x64)
+User-Agent: Codex Desktop/26.901.51231 (win32; x64)
 Accept: application/json
 Accept-Encoding: gzip, deflate
 ```
@@ -1250,6 +1134,8 @@ If `/codex/models` returns anything outside that shape, the proxy treats the res
 - `display_name`
 - `description`
 - `is_default`
+- `context_window`
+- `max_context_window`
 - `default_reasoning_effort`
 - `default_reasoning_level`
 - `supported_reasoning_efforts`
@@ -1263,7 +1149,7 @@ If `/codex/models` returns anything outside that shape, the proxy treats the res
 - `description`
 
 ```bash
-curl -sS "${CODEX_BASE_URL}/codex/models?client_version=26.707.31428" \
+curl -sS "${CODEX_BASE_URL}/codex/models?client_version=26.901.51231" \
   -H "Authorization: Bearer ${ACCESS_TOKEN}" \
   -H "ChatGPT-Account-Id: ${ACCOUNT_ID}" \
   -H "Accept: application/json"
@@ -1348,7 +1234,7 @@ POST https://auth.openai.com/api/accounts/deviceauth/usercode
 
 ```http
 Content-Type: application/json
-User-Agent: Codex Desktop/26.707.31428 (win32; x64)
+User-Agent: Codex Desktop/26.901.51231 (win32; x64)
 ```
 
 ### Request body
@@ -1397,7 +1283,7 @@ POST https://auth.openai.com/api/accounts/deviceauth/token
 
 ```http
 Content-Type: application/json
-User-Agent: Codex Desktop/26.707.31428 (win32; x64)
+User-Agent: Codex Desktop/26.901.51231 (win32; x64)
 ```
 
 ### Request body
@@ -1450,7 +1336,7 @@ POST https://auth.openai.com/oauth/token
 
 ```http
 Content-Type: application/x-www-form-urlencoded
-User-Agent: Codex Desktop/26.707.31428 (win32; x64)
+User-Agent: Codex Desktop/26.901.51231 (win32; x64)
 ```
 
 ### Authorization-code exchange request
@@ -1552,7 +1438,6 @@ These claims are read from tokens by the proxy:
 ### Upstream write paths
 
 - `POST /codex/responses`
-- `POST /codex/responses/compact`
 - `WSS /codex/responses`
 - `POST /api/accounts/deviceauth/usercode`
 - `POST /api/accounts/deviceauth/token`

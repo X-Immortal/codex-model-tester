@@ -50,7 +50,7 @@ type openedRequest struct {
 
 type bufferedEventStream struct {
 	events []*codex.StreamEvent
-	stream eventStream
+	eventStream
 }
 
 func (s *bufferedEventStream) NextEvent() (*codex.StreamEvent, error) {
@@ -59,11 +59,8 @@ func (s *bufferedEventStream) NextEvent() (*codex.StreamEvent, error) {
 		s.events = s.events[1:]
 		return event, nil
 	}
-	return s.stream.NextEvent()
+	return s.eventStream.NextEvent()
 }
-
-func (s *bufferedEventStream) Close() error         { return s.stream.Close() }
-func (s *bufferedEventStream) Headers() http.Header { return s.stream.Headers() }
 
 func (a *App) handleChatCompletions(c *gin.Context) {
 	a.handlePublicRequest(
@@ -256,12 +253,12 @@ func (a *App) prepareStreamForDelivery(ctx context.Context, account accounts.Rec
 		if a.observeQuotaEvent(account, event) {
 			continue
 		}
-		if err := upstreamEventError(event); err != nil {
+		if err := codex.StreamEventError(event); err != nil {
 			return nil, err
 		}
 		events = append(events, event)
 		if streaming || event.IsTerminalResponse() {
-			return &bufferedEventStream{events: events, stream: stream}, nil
+			return &bufferedEventStream{events: events, eventStream: stream}, nil
 		}
 	}
 }
@@ -373,6 +370,7 @@ func (a *App) streamChatCompletion(c *gin.Context, account accounts.Record, norm
 	}
 	images := newChatImageStreamer()
 	var tupleTextBuffer strings.Builder
+	textSent := false
 	writeSSE(c.Writer, "", turn.MustJSON(turn.ChatChunk("", normalized.Model, map[string]any{"role": "assistant"}, "", createdAt)))
 	c.Writer.Flush()
 
@@ -427,6 +425,7 @@ func (a *App) streamChatCompletion(c *gin.Context, account accounts.Record, norm
 				tupleTextBuffer.WriteString(delta)
 				continue
 			}
+			textSent = true
 			writeSSE(c.Writer, "", turn.MustJSON(turn.ChatChunk(accumulator.ResponseID, jsonutil.FirstNonEmpty(accumulator.Model, normalized.Model), map[string]any{"content": delta}, "", createdAt)))
 			c.Writer.Flush()
 		case "response.output_text.done":
@@ -437,6 +436,9 @@ func (a *App) streamChatCompletion(c *gin.Context, account accounts.Record, norm
 				}
 			}
 		case "response.completed", "response.incomplete":
+			if normalized.TupleSchema != nil && tupleTextBuffer.Len() == 0 {
+				tupleTextBuffer.WriteString(accumulator.Text())
+			}
 			if normalized.TupleSchema != nil && strings.TrimSpace(tupleTextBuffer.String()) != "" {
 				reconverted := tupleTextBuffer.String()
 				if patched, err := openai.ReconvertJSONText(reconverted, normalized.TupleSchema); err != nil {
@@ -444,6 +446,7 @@ func (a *App) streamChatCompletion(c *gin.Context, account accounts.Record, norm
 				} else {
 					reconverted = patched
 				}
+				textSent = true
 				writeSSE(c.Writer, "", turn.MustJSON(turn.ChatChunk(accumulator.ResponseID, jsonutil.FirstNonEmpty(accumulator.Model, normalized.Model), map[string]any{"content": reconverted}, "", createdAt)))
 				c.Writer.Flush()
 			}
@@ -455,8 +458,14 @@ func (a *App) streamChatCompletion(c *gin.Context, account accounts.Record, norm
 
 	a.finalizeSuccessfulStream(account.ID, accumulator, stream)
 
+	finalDelta := map[string]any{}
+	if !textSent {
+		if text := accumulator.Text(); text != "" {
+			finalDelta["content"] = text
+		}
+	}
 	finalUsage := accumulator.ChatUsageObject()
-	finalChunk := turn.ChatChunk(accumulator.ResponseID, jsonutil.FirstNonEmpty(accumulator.Model, normalized.Model), map[string]any{}, accumulator.ChatFinishReason(), createdAt)
+	finalChunk := turn.ChatChunk(accumulator.ResponseID, jsonutil.FirstNonEmpty(accumulator.Model, normalized.Model), finalDelta, accumulator.ChatFinishReason(), createdAt)
 	if nativeFinishReason := accumulator.NativeFinishReason(); nativeFinishReason != "" {
 		choices := finalChunk["choices"].([]map[string]any)
 		choices[0]["native_finish_reason"] = nativeFinishReason
@@ -479,7 +488,7 @@ func (a *App) nextStreamEvent(ctx context.Context, account accounts.Record, accu
 			continue
 		}
 		accumulator.Apply(event)
-		if upstreamErr := upstreamEventError(event); upstreamErr != nil {
+		if upstreamErr := codex.StreamEventError(event); upstreamErr != nil {
 			return nil, true, upstreamErr
 		}
 		return event, false, nil
@@ -548,16 +557,7 @@ func normalizeChatCompletionsBody(body []byte, catalog *models.Catalog) (turn.No
 		return turn.NormalizedRequest{}, errors.New("request body must include chat messages or responses input")
 	}
 
-	var responsesReq openai.ResponsesRequest
-	if err := json.Unmarshal(body, &responsesReq); err != nil {
-		return turn.NormalizedRequest{}, err
-	}
-
-	normalized, err := openai.Responses(responsesReq, catalog)
-	if err != nil {
-		return turn.NormalizedRequest{}, err
-	}
-	return normalized, nil
+	return normalizeResponsesBody(body, catalog)
 }
 
 func normalizeResponsesBody(body []byte, catalog *models.Catalog) (turn.NormalizedRequest, error) {

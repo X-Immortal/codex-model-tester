@@ -4,6 +4,7 @@ package jsonutil
 import (
 	"encoding/json"
 	"fmt"
+	"strconv"
 	"strings"
 )
 
@@ -134,5 +135,34 @@ func SliceOfMaps(value any) []map[string]any {
 		return out
 	default:
 		return nil
+	}
+}
+
+// IntValue converts a decoded JSON number or numeric string to an integer.
+func IntValue(value any) (int, bool) {
+	switch typed := value.(type) {
+	case int:
+		return typed, true
+	case int32:
+		return int(typed), true
+	case int64:
+		return int(typed), true
+	case float64:
+		return int(typed), true
+	case json.Number:
+		parsed, err := typed.Int64()
+		if err == nil {
+			return int(parsed), true
+		}
+		floatValue, floatErr := typed.Float64()
+		if floatErr == nil {
+			return int(floatValue), true
+		}
+		return 0, false
+	case string:
+		parsed, err := strconv.Atoi(strings.TrimSpace(typed))
+		return parsed, err == nil
+	default:
+		return 0, false
 	}
 }

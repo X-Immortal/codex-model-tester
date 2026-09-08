@@ -22,7 +22,7 @@ func TestResolveSessionImplicitResumeTrimsHistoryAndSetsContinuationState(t *tes
 	}
 	normalized := turn.NormalizedRequest{
 		Request: codex.Request{
-			Model:        "gpt-5.4",
+			Model:        "gpt-5.6-terra",
 			Instructions: "Be concise.",
 			Input: []codex.InputItem{
 				userText("hello"),
@@ -81,12 +81,12 @@ func TestResolveSessionCarriesToolNameAliasesAcrossExplicitContinuation(t *testi
 	app.continuations.Put(conversation.ContinuationRecord{
 		ResponseID:      "resp_long_tool",
 		AccountID:       "acct_1",
-		Model:           "gpt-5.4",
+		Model:           "gpt-5.6-terra",
 		ToolNameAliases: map[string]string{"mcp__short": "mcp__original_long_tool_name"},
 	})
 
 	resolution, err := app.resolveSession(turn.NormalizedRequest{Request: codex.Request{
-		Model:              "gpt-5.4",
+		Model:              "gpt-5.6-terra",
 		PreviousResponseID: "resp_long_tool",
 	}})
 	if err != nil {
@@ -104,7 +104,7 @@ func TestResolveSessionBuildsReplayForExplicitHTTPContinuation(t *testing.T) {
 	app.continuations.Put(conversation.ContinuationRecord{
 		ResponseID: "resp_replay",
 		AccountID:  "acct_1",
-		Model:      "gpt-5.4",
+		Model:      "gpt-5.6-terra",
 		InputHistory: []turn.InputItem{
 			cloneContinuationInputItem(userText("first")),
 			cloneContinuationInputItem(assistantText("first answer")),
@@ -112,7 +112,7 @@ func TestResolveSessionBuildsReplayForExplicitHTTPContinuation(t *testing.T) {
 	})
 
 	resolution, err := app.resolveSession(turn.NormalizedRequest{Request: codex.Request{
-		Model:              "gpt-5.4",
+		Model:              "gpt-5.6-terra",
 		PreviousResponseID: "resp_replay",
 		Input:              []codex.InputItem{userText("second")},
 	}})
@@ -132,7 +132,7 @@ func TestResolveSessionPreservesExplicitPromptCacheKey(t *testing.T) {
 
 	app := &App{continuations: conversation.NewContinuationManager(time.Minute)}
 	normalized := turn.NormalizedRequest{Request: codex.Request{
-		Model:          "gpt-5.4",
+		Model:          "gpt-5.6-terra",
 		PromptCacheKey: "client-cache-key",
 		Input:          []codex.InputItem{userText("hello")},
 	}}
@@ -157,7 +157,7 @@ func TestResolveSessionSkipsImplicitResumeForUnknownToolOutputCallID(t *testing.
 	}
 	normalized := turn.NormalizedRequest{
 		Request: codex.Request{
-			Model:        "gpt-5.4",
+			Model:        "gpt-5.6-terra",
 			Instructions: "Be concise.",
 			Input: []codex.InputItem{
 				userText("hello"),
@@ -201,7 +201,7 @@ func TestResolveSessionChoosesMatchingHistoryWithinConversationBucket(t *testing
 	}
 	normalized := turn.NormalizedRequest{
 		Request: codex.Request{
-			Model:        "gpt-5.4",
+			Model:        "gpt-5.6-terra",
 			Instructions: "Be concise.",
 			Input: []codex.InputItem{
 				userText("hello"),
@@ -263,7 +263,7 @@ func TestResolveSessionImplicitResumeFallsBackForHostedToolReplayWithoutConversa
 	}
 	firstTurn := turn.NormalizedRequest{
 		Request: codex.Request{
-			Model:        "gpt-5.4",
+			Model:        "gpt-5.6-terra",
 			Instructions: "Be concise.",
 			Input: []codex.InputItem{
 				userText("hello"),
@@ -303,7 +303,7 @@ func TestResolveSessionImplicitResumeFallsBackForHostedToolReplayWithoutConversa
 
 	secondTurn := turn.NormalizedRequest{
 		Request: codex.Request{
-			Model:        "gpt-5.4",
+			Model:        "gpt-5.6-terra",
 			Instructions: "Be concise.",
 			Input: []codex.InputItem{
 				userText("hello"),
@@ -378,11 +378,11 @@ func TestAcquireAccountForResolutionOmittedModelUsesRouteScopedDefault(t *testin
 		UpdatedAt: time.Now().UTC(),
 	})
 	catalog := models.NewCatalog(models.BootstrapEntries())
-	catalog.ApplyRouteModels("plan:plus", []models.Entry{
+	catalog.ApplyRouteModels("acct:acct_plus", []models.Entry{
 		{ID: "gpt-premium-default", IsDefault: true},
 		{ID: "gpt-free-basic"},
 	})
-	catalog.ApplyRouteModels("plan:free", []models.Entry{
+	catalog.ApplyRouteModels("acct:acct_free", []models.Entry{
 		{ID: "gpt-free-basic"},
 	})
 

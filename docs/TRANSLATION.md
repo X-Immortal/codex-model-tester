@@ -35,8 +35,8 @@ The compact pipeline is:
 1. Accept OpenAI-compatible JSON on `/v1/responses/compact`.
 2. Normalize that payload into `turn.NormalizedCompactRequest`, which embeds `turn.CompactRequest`.
 3. If `previous_response_id` is present, expand saved continuation history locally.
-4. Call the private compact backend over JSON HTTP.
-5. Rebuild an OpenAI-style `response.compaction` object.
+4. Append a compaction trigger and consume the upstream Responses stream.
+5. Return the encrypted context in an OpenAI-style `response.compaction` object.
 
 The image pipeline is:
 
@@ -115,7 +115,7 @@ Malformed JSON, unsupported event types, and other request-level protocol errors
 
 `POST /v1/responses/compact` binds directly to `openai.ResponsesCompactRequest` and normalizes with `openai.Compact(...)`.
 
-Unlike `/v1/responses`, this endpoint does not use the SSE streaming path. It sends a dedicated JSON request to `/codex/responses/compact` and always returns non-streaming JSON.
+The public endpoint returns non-streaming JSON. Internally, it uses the Responses SSE transport and collects encrypted compaction state before returning. Pass the returned `output` into the next `/v1/responses` request, followed by the new user message.
 
 ### `/v1/images/generations` and `/v1/images/edits`
 
@@ -135,7 +135,7 @@ The direct adapter forwards image fields including:
 
 JSON edits accept `images` entries containing `image_url` or `file_id`, plus an optional `mask`. Multipart edits accept one or more `image` or `image[]` files and an optional `mask` file; uploads are encoded as data URLs before being sent upstream.
 
-Native non-streaming responses and their metadata are returned unchanged. Native streaming responses are forwarded frame-for-frame and are flushed as they arrive.
+Native non-streaming responses and their metadata are returned unchanged. Native SSE responses are forwarded and flushed as they arrive. When streaming is requested but upstream returns JSON, the proxy converts each image into a completed SSE event and preserves its metadata.
 
 If a native endpoint responds with `404`, `405`, or `501`, the request falls back to an enclosing Responses request using a forced `image_generation` tool. Other upstream errors are returned directly and do not trigger fallback.
 
@@ -146,6 +146,18 @@ Image options are passed through, not simulated locally. Live direct-endpoint te
 ## Model Resolution
 
 Model normalization does not rewrite user-supplied model IDs.
+
+The bootstrap catalog includes `gpt-6-astra`, `gpt-5.6-sol`, `gpt-5.6-terra`,
+`gpt-5.6-luna`, `gpt-5.5`, and `gpt-5.3-codex-spark`. Astra and Sol advertise a
+`low` default reasoning level; the proxy's default model is Astra. Astra
+accepts the Codex effort levels `low`, `medium`, `high`, `xhigh`, `max`, and
+`ultra`.
+
+Model discovery records access per account, including accounts on the same plan.
+Model limits and reasoning metadata from upstream are cached and returned to Codex
+clients requesting `/v1/models?client_version=...`. The bundled Astra context
+limits are 272,000 by default and 872,000 maximum; these are Codex client limits,
+not the public API's advertised context size.
 
 - If a model is explicitly supplied, it must exist in the current model catalog.
 - If no model is supplied, normalization leaves it empty.
@@ -310,7 +322,7 @@ Responses ignored fields:
 - `metadata`
 - `stream_options`
 
-`service_tier` is retained on the canonical request and sent on the HTTP Codex path. OpenAI's `auto` value is normalized to Codex's `default` wire value, and the compatibility alias `fast` is normalized to `priority`. The current WebSocket payload builder does not include `service_tier`.
+`service_tier` is retained on the canonical request and sent on both HTTP and WebSocket Codex paths. OpenAI's `auto` value is normalized to Codex's `default` wire value, and the compatibility alias `fast` is normalized to `priority`.
 
 The Chat Completions, Responses, and Responses compact JSON handlers decode `Content-Encoding: zstd` request bodies. Identity or an omitted encoding is accepted; other request content encodings are rejected locally.
 
@@ -331,7 +343,7 @@ If `previous_response_id` is supplied:
 
 ### Explicit continuation for compaction
 
-`/v1/responses/compact` handles `previous_response_id` differently because the private compact backend does not accept continuation state directly.
+`/v1/responses/compact` expands `previous_response_id` into a complete context window before compaction.
 
 If `previous_response_id` is supplied on the compact endpoint:
 
@@ -339,7 +351,7 @@ If `previous_response_id` is supplied on the compact endpoint:
 - If the ID is unknown or expired, it returns `400` with code `invalid_previous_response_id`.
 - If the compact request did not specify a model, the model is filled from the saved continuation record.
 - Saved continuation history is converted back into Codex input items and prepended to the current compact request input.
-- `previous_response_id` is not sent upstream to `/codex/responses/compact`.
+- `previous_response_id` is not sent upstream.
 
 The compact endpoint does not perform implicit continuation detection.
 
@@ -379,7 +391,7 @@ The conversation prefix stops at the last assistant or tool-call item. Explicit 
 
 ## Upstream Transport Translation
 
-Chat Completions and Responses requests consume an upstream stream even when the public request is non-streaming. Native Images requests use the matching JSON or SSE mode. Responses compact uses a dedicated JSON request and response.
+Chat Completions and Responses requests consume an upstream stream even when the public request is non-streaming. Native Images requests use the matching JSON or SSE mode. Responses compact also consumes an upstream stream and returns a JSON compaction object.
 
 ### HTTP path
 
@@ -410,7 +422,7 @@ The proxy uses `WSS /codex/responses` for implicit continuations, requests conta
 - optional `include`
 - optional `generate` for public WebSocket turns
 
-The WebSocket payload omits `stream`, `store`, and `service_tier`. A persistent public WebSocket session can send later `response.create` or `response.append` turns over the same upstream connection when the account does not change. Downstream append turns are normalized to upstream `response.create` payloads with `previous_response_id` and incremental input.
+The WebSocket payload omits `stream` and `store`; it forwards `service_tier` when supplied. A persistent public WebSocket session can send later `response.create` or `response.append` turns over the same upstream connection when the account does not change. Downstream append turns are normalized to upstream `response.create` payloads with `previous_response_id` and incremental input.
 
 ## Upstream Events the Proxy Consumes
 
@@ -507,19 +519,14 @@ The reconversion rewrites object-shaped `"0"`, `"1"` tuple placeholders back int
 
 ### Compact response shaping
 
-The private compact backend may return only partial JSON such as:
+The proxy collects the encrypted compaction item from the stream and returns:
 
-- `output`
-
-The proxy reshapes that into an OpenAI-style compaction object with:
-
-- `id`
+- `id` and `created_at` from upstream response metadata
 - `object = "response.compaction"`
-- `created_at`
-- `output`
+- `output` containing the encrypted context for the next request
 - `usage` when present upstream
 
-If the upstream body omits `id` or `created_at`, the proxy synthesizes them locally. `usage` is omitted when it is not present upstream.
+A successful compaction requires a completed stream and exactly one compaction item with non-empty `encrypted_content`. Truncated, failed, and incomplete streams return errors. The final event may have an empty `output` array; the proxy collects the compaction item from the item completion event.
 
 If tuple-schema reconversion is active, the proxy applies the same output-message reconversion used by `/v1/responses` before returning the compacted object.
 

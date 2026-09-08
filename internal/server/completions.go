@@ -67,11 +67,12 @@ func (a *App) streamCompletion(c *gin.Context, account accounts.Record, normaliz
 	prepareStreamResponse(c)
 	accumulator := turn.NewAccumulator(normalized)
 	createdAt := time.Now().UTC().Unix()
+	textSent := false
 
 	for {
 		event, upstreamErr, err := a.nextStreamEvent(c.Request.Context(), account, accumulator, stream)
 		if err != nil {
-			if err == io.EOF && accumulator.IsCompleted() {
+			if err == io.EOF && accumulator.IsTerminal() {
 				break
 			}
 			if err == io.EOF {
@@ -82,17 +83,22 @@ func (a *App) streamCompletion(c *gin.Context, account accounts.Record, normaliz
 		}
 		if event.Type == "response.output_text.delta" {
 			if delta := jsonutil.StringValue(event.Raw["delta"]); delta != "" {
+				textSent = true
 				writeSSE(c.Writer, "", turn.MustJSON(completionChunk(accumulator.ResponseID, jsonutil.FirstNonEmpty(accumulator.Model, normalized.Model), delta, "", createdAt)))
 				c.Writer.Flush()
 			}
 		}
-		if event.Type == "response.completed" {
+		if event.IsTerminalResponse() {
 			break
 		}
 	}
 
 	a.finalizeSuccessfulStream(account.ID, accumulator, stream)
-	final := completionChunk(accumulator.ResponseID, jsonutil.FirstNonEmpty(accumulator.Model, normalized.Model), "", "stop", createdAt)
+	finalText := ""
+	if !textSent {
+		finalText = accumulator.Text()
+	}
+	final := completionChunk(accumulator.ResponseID, jsonutil.FirstNonEmpty(accumulator.Model, normalized.Model), finalText, accumulator.ChatFinishReason(), createdAt)
 	if usage := accumulator.ChatUsageObject(); usage != nil {
 		final["usage"] = usage
 	}

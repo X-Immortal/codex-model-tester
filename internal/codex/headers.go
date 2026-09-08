@@ -9,7 +9,7 @@ import (
 )
 
 const (
-	desktopClientVersion = "26.707.31428"
+	desktopClientVersion = "26.901.51231"
 	desktopOriginator    = "Codex Desktop"
 	openAIBeta           = "responses_websockets=2026-02-06"
 	codexResidency       = "us"

@@ -48,6 +48,8 @@ func normalizeBackendEntry(raw codex.BackendModelEntry) (Entry, bool) {
 		ID:                        id,
 		DisplayName:               jsonutil.FirstNonEmpty(strings.TrimSpace(raw.DisplayName), strings.TrimSpace(raw.Name), id),
 		Description:               strings.TrimSpace(raw.Description),
+		ContextWindow:             raw.ContextWindow,
+		MaxContextWindow:          raw.MaxContextWindow,
 		IsDefault:                 raw.IsDefault,
 		DefaultReasoningEffort:    defaultEffort,
 		SupportedReasoningEfforts: efforts,

@@ -128,7 +128,7 @@ func TestReplayManagerInjectsOnlyMatchingMissingToolState(t *testing.T) {
 
 	manager := NewReplayManager(time.Minute)
 	accumulator := turn.NewAccumulator(turn.NormalizedRequest{Request: codex.Request{
-		Model:   "gpt-5.4",
+		Model:   "gpt-5.6-terra",
 		Include: []string{"reasoning.encrypted_content"},
 	}})
 	accumulator.Apply(&codex.StreamEvent{Type: "response.completed", Raw: map[string]any{
@@ -147,13 +147,13 @@ func TestReplayManagerInjectsOnlyMatchingMissingToolState(t *testing.T) {
 			},
 		},
 	}})
-	if !manager.Remember("session-a", "gpt-5.4", "acct-a", accumulator) {
+	if !manager.Remember("session-a", "gpt-5.6-terra", "acct-a", accumulator) {
 		t.Fatal("Remember() = false, want cached replay state")
 	}
 
 	maxTokens := 10
 	request := MessagesRequest{
-		Model:     "gpt-5.4",
+		Model:     "gpt-5.6-terra",
 		MaxTokens: &maxTokens,
 		Messages: []Message{{Role: "user", Content: Content{{
 			Type: "tool_result", ToolUseID: "call_1", Content: Content{{Type: "text", Text: "result"}},

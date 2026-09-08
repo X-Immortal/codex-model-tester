@@ -16,7 +16,7 @@ type UsageResponseCodeReviewRateLimit struct {
 type UsageResponseCredits struct {
 	HasCredits  *bool    `json:"has_credits,omitempty"`
 	Unlimited   *bool    `json:"unlimited,omitempty"`
-	Balance     *float64 `json:"balance,omitempty"`
+	Balance     *float64 `json:"balance,omitempty,string"`
 	ActiveLimit *string  `json:"active_limit,omitempty"`
 }
 
