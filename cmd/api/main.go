@@ -15,9 +15,13 @@ import (
 )
 
 func main() {
+	applyPlatformDefaults()
+	retainEmbeddedLegalNotices()
+
 	cfg, err := config.Load()
 	if err != nil {
 		slog.Error("failed to load config", "error", err)
+		showFatalError("Codex Model Tester 启动失败", err)
 		os.Exit(1)
 	}
 
@@ -27,6 +31,7 @@ func main() {
 	app, err := server.New(cfg, logger)
 	if err != nil {
 		logger.Error("failed to build server", "error", err)
+		showFatalError("Codex Model Tester 启动失败", err)
 		os.Exit(1)
 	}
 	defer app.Close()
@@ -41,6 +46,7 @@ func main() {
 	listener, err := net.Listen("tcp", cfg.ListenAddr)
 	if err != nil {
 		logger.Error("failed to listen", "addr", cfg.ListenAddr, "error", err)
+		showFatalError("Codex Model Tester 无法启动本地服务", err)
 		os.Exit(1)
 	}
 
@@ -48,25 +54,33 @@ func main() {
 		logger.Info("server listening", "addr", listener.Addr().String(), "data_dir", cfg.DataDir)
 		if err := srv.Serve(listener); err != nil && err != http.ErrServerClosed {
 			logger.Error("server exited", "error", err)
+			showFatalError("Codex Model Tester 后端已停止", err)
 			os.Exit(1)
 		}
 	}()
+	url, err := adminUIURL(cfg.ListenAddr)
+	if err != nil {
+		logger.Error("resolve admin UI URL failed", "error", err)
+		showFatalError("Codex Model Tester 无法解析网页地址", err)
+		os.Exit(1)
+	}
 	if cfg.OpenBrowser {
-		url, err := adminUIURL(cfg.ListenAddr)
-		if err != nil {
-			logger.Warn("resolve admin UI URL failed", "error", err)
-		} else if err := openBrowser(url); err != nil {
+		if err := openBrowser(url); err != nil {
 			logger.Warn("open admin UI failed", "url", url, "error", err)
 		} else {
 			logger.Info("admin UI opened", "url", url)
 		}
 	}
 
-	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
-	defer stop()
-	ctx, stopDesktopParent := desktopParentShutdownContext(ctx, os.Stdin, os.Getenv("CODEX_DESKTOP_PARENT") == "1")
-	defer stopDesktopParent()
-	<-ctx.Done()
+	signalCtx, stopSignals := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
+	defer stopSignals()
+	ctx, requestShutdown := context.WithCancel(signalCtx)
+	defer requestShutdown()
+	if err := waitForApplicationExit(ctx, requestShutdown, url, logger); err != nil {
+		logger.Error("application lifecycle failed", "error", err)
+		showFatalError("Codex Model Tester 托盘运行失败", err)
+		requestShutdown()
+	}
 
 	logger.Info("shutdown requested")
 	shutdownCtx, cancel := context.WithTimeout(context.Background(), 10*time.Second)

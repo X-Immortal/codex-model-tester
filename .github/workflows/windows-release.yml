@@ -1,0 +1,32 @@
+name: Windows portable executable
+
+on:
+  workflow_dispatch:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: read
+
+jobs:
+  windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v6
+        with:
+          go-version-file: go.mod
+          cache: true
+
+      - name: Build portable tray application
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force dist | Out-Null
+          go build -trimpath -buildvcs=false -ldflags="-s -w -H=windowsgui" -o dist/Codex-Model-Tester-windows-x64.exe ./cmd/api
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: codex-model-tester-windows-x64
+          path: dist/Codex-Model-Tester-windows-x64.exe
+          if-no-files-found: error

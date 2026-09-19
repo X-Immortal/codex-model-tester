@@ -34,7 +34,7 @@ an MIT-licensed OpenAI- and Anthropic-compatible proxy. It retains the original
 proxy APIs and multi-account routing, while this fork adds a localhost-only
 model-testing UI, account-scoped model discovery, raw upstream model comparison,
 quota and heartbeat monitoring, OAuth logout, automatic browser startup, and
-Electron desktop packaging.
+a single-file Windows tray launcher for the local Web UI.
 
 ## Features
 
@@ -187,28 +187,29 @@ Docker Compose intentionally requires a stable value), `PORT` (`8080`),
 `DATA_DIR` (`data`, or `/app/data` in Docker), `DEBUG_LOG_PAYLOADS` (`false`),
 and `OPEN_BROWSER` (`true` for direct runs, disabled by the Docker config).
 
-## Desktop packages
+## Windows application
 
-The `desktop` directory wraps the embedded Web UI in a real Electron window.
-Windows builds install through NSIS and stay available from the system tray;
-closing the window hides it, while the tray `退出` action also shuts down the Go
-backend. macOS builds are standard `.app` bundles packaged as ZIP or DMG and use
-the same menu-bar lifecycle. Runtime credentials are stored under Electron's
-per-user application data directory, never inside the installation directory.
-Desktop packaging requires Node.js 24 with npm in addition to the Go version
-listed above.
+The Windows release is one portable executable containing the Go backend and
+embedded Web UI. Double-click it to start the local service in the system tray
+and open the tester in the default browser. Use the tray menu to reopen the
+page or choose `退出` to stop the backend. It does not require Node.js,
+Electron, an installer, or a manually configured proxy API key.
+
+By default, runtime data is stored in
+`%AppData%\Codex Backend Model Tester\data`, not beside the executable. An
+explicit `DATA_DIR` still takes precedence.
+
+Build the Windows x64 executable from any Go-supported host:
 
 ```bash
-cd desktop
-npm ci
-npm run icon
-npm run dist:win         # Windows x64 NSIS installer
-npm run dist:mac         # universal macOS DMG + ZIP; run on macOS
+GOOS=windows GOARCH=amd64 CGO_ENABLED=0 \
+  go build -trimpath -buildvcs=false -ldflags="-s -w -H=windowsgui" \
+  -o dist/Codex-Model-Tester-windows-x64.exe ./cmd/api
 ```
 
-Unsigned local builds can trigger Windows SmartScreen or macOS Gatekeeper. The
-native DMG build requires macOS; `.github/workflows/desktop-release.yml` runs it
-on a macOS runner.
+Unsigned builds can trigger Windows SmartScreen. The
+`.github/workflows/windows-release.yml` workflow produces the same portable
+executable for version tags and manual runs.
 
 `${DATA_DIR}` holds `accounts.json` — accounts, OAuth tokens, labels, status,
 quota, cooldowns — `models-cache.json`, and `heartbeats.json`. Heartbeats choose
