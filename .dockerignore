@@ -12,3 +12,8 @@ tmp*
 *.dylib
 *.test
 *.out
+dist
+desktop/backend
+desktop/.backend-tmp
+desktop/node_modules
+.DS_Store

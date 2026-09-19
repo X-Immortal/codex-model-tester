@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"log/slog"
+	"net"
 	"net/http"
 	"os"
 	"os/signal"
@@ -37,17 +38,34 @@ func main() {
 		ReadTimeout:       60 * time.Second,
 		IdleTimeout:       120 * time.Second,
 	}
+	listener, err := net.Listen("tcp", cfg.ListenAddr)
+	if err != nil {
+		logger.Error("failed to listen", "addr", cfg.ListenAddr, "error", err)
+		os.Exit(1)
+	}
 
 	go func() {
-		logger.Info("server listening", "addr", cfg.ListenAddr, "data_dir", cfg.DataDir)
-		if err := srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+		logger.Info("server listening", "addr", listener.Addr().String(), "data_dir", cfg.DataDir)
+		if err := srv.Serve(listener); err != nil && err != http.ErrServerClosed {
 			logger.Error("server exited", "error", err)
 			os.Exit(1)
 		}
 	}()
+	if cfg.OpenBrowser {
+		url, err := adminUIURL(cfg.ListenAddr)
+		if err != nil {
+			logger.Warn("resolve admin UI URL failed", "error", err)
+		} else if err := openBrowser(url); err != nil {
+			logger.Warn("open admin UI failed", "url", url, "error", err)
+		} else {
+			logger.Info("admin UI opened", "url", url)
+		}
+	}
 
 	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
 	defer stop()
+	ctx, stopDesktopParent := desktopParentShutdownContext(ctx, os.Stdin, os.Getenv("CODEX_DESKTOP_PARENT") == "1")
+	defer stopDesktopParent()
 	<-ctx.Done()
 
 	logger.Info("shutdown requested")

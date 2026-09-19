@@ -2,6 +2,7 @@ package server
 
 import (
 	"context"
+	"fmt"
 	"log/slog"
 	"net/http"
 	"time"
@@ -31,6 +32,8 @@ type App struct {
 	accountMgr      *accountmanager.AccountManager
 	httpClient      *codex.HTTPClient
 	httpStream      func(context.Context, accounts.Record, codex.Request, string) (eventStream, error)
+	fetchModels     func(context.Context, accounts.Record) ([]codex.BackendModelEntry, error)
+	revokeOAuth     func(context.Context, accounts.OAuthToken) error
 	compactCaller   func(context.Context, accounts.Record, codex.CompactRequest) (codex.CompactResponse, *accounts.QuotaSnapshot, error)
 	imageOpener     func(*gin.Context, string, turn.NormalizedRequest) (openedRequest, bool)
 	directImageOpen func(context.Context, accounts.Record, string, []byte, bool) (*http.Response, error)
@@ -38,12 +41,23 @@ type App struct {
 	continuations   *conversation.ContinuationManager
 	claudeReplays   *anthropic.ReplayManager
 	models          *models.Catalog
+	heartbeats      *heartbeatManager
+	notifyHeartbeat func(string, string) error
 	cancel          context.CancelFunc
+	adminUISession  string
 }
 
 func New(cfg config.Config, logger *slog.Logger) (*App, error) {
+	adminUISession, err := newAdminUISessionToken()
+	if err != nil {
+		return nil, fmt.Errorf("create admin UI session: %w", err)
+	}
 	accountsStore := jsonstore.NewJSONAccountsStore(cfg.DataDir)
 	accountsSvc, err := accounts.NewService(accountsStore, accounts.RotationLeastUsed)
+	if err != nil {
+		return nil, err
+	}
+	heartbeats, err := newHeartbeatManager(cfg.DataDir)
 	if err != nil {
 		return nil, err
 	}
@@ -68,16 +82,21 @@ func New(cfg config.Config, logger *slog.Logger) (*App, error) {
 	engine.Use(middleware.Recovery(logger))
 
 	app := &App{
-		cfg:           cfg,
-		logger:        logger,
-		engine:        engine,
-		accounts:      accountsSvc,
-		deviceLogins:  deviceLogins,
-		accountMgr:    accountMgr,
-		httpClient:    httpClient,
-		continuations: conversation.NewContinuationManager(cfg.ContinuationTTL),
-		claudeReplays: anthropic.NewReplayManager(cfg.ContinuationTTL),
-		models:        modelCatalog,
+		cfg:             cfg,
+		logger:          logger,
+		engine:          engine,
+		accounts:        accountsSvc,
+		deviceLogins:    deviceLogins,
+		accountMgr:      accountMgr,
+		fetchModels:     httpClient.GetCodexModels,
+		revokeOAuth:     oauthSvc.Revoke,
+		httpClient:      httpClient,
+		continuations:   conversation.NewContinuationManager(cfg.ContinuationTTL),
+		claudeReplays:   anthropic.NewReplayManager(cfg.ContinuationTTL),
+		models:          modelCatalog,
+		heartbeats:      heartbeats,
+		notifyHeartbeat: sendDesktopNotification,
+		adminUISession:  adminUISession,
 	}
 	app.routes()
 
@@ -85,6 +104,7 @@ func New(cfg config.Config, logger *slog.Logger) (*App, error) {
 	app.cancel = cancel
 	go app.housekeeping(ctx)
 	go modelRefresher.Run(ctx)
+	go app.heartbeatLoop(ctx)
 
 	return app, nil
 }

@@ -1,0 +1,140 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#fbfaff">
+  <title>Codex 模型测试</title>
+  <link rel="stylesheet" href="/admin-ui/style.css">
+</head>
+<body>
+  <div class="app-shell">
+    <header class="topbar">
+      <div class="brand">
+        <span class="brand-mark" aria-hidden="true"><img src="/admin-ui/openai-logomark.svg" alt=""></span>
+        <h1>Codex 模型测试</h1>
+      </div>
+    </header>
+
+    <main class="layout">
+      <aside class="panel sidebar">
+        <div class="panel-heading">
+          <h2>账号</h2>
+          <span id="account-count" class="count-badge">0</span>
+        </div>
+        <button id="add-account" class="button primary full-width" type="button">添加账号</button>
+        <div id="device-login" class="login-box hidden"></div>
+        <div id="accounts-list" class="accounts-list">
+          <div class="empty-state">正在加载账号。</div>
+        </div>
+      </aside>
+
+      <section class="content">
+        <div class="content-grid">
+          <section class="panel tester-panel">
+            <div class="panel-heading">
+              <h2>模型测试</h2>
+              <span id="selected-account" class="account-chip"><span class="chip-dot"></span>未选择账号</span>
+            </div>
+            <div class="control-row">
+              <div class="field model-field">
+                <label for="model-select">当前账号可用模型</label>
+                <select id="model-select" disabled>
+                  <option value="">请先选择账号</option>
+                </select>
+              </div>
+              <button id="test-model" class="button primary test-button" type="button" disabled>
+                <span class="button-spinner" aria-hidden="true"></span>
+                <span class="test-button-label">测试</span>
+              </button>
+              <button id="add-heartbeat" class="button secondary heartbeat-trigger" type="button" disabled>添加心跳</button>
+              <div id="heartbeat-interval-picker" class="heartbeat-inline-picker hidden">
+                <select id="heartbeat-interval" aria-label="选择随机监测间隔">
+                  <option value="" selected>选择间隔</option>
+                  <option value="60">1–10 分钟</option>
+                  <option value="300">5–15 分钟</option>
+                  <option value="600">10–30 分钟</option>
+                  <option value="900">15–45 分钟</option>
+                  <option value="1800">30–90 分钟</option>
+                  <option value="3600">1–3 小时</option>
+                  <option value="10800">3–6 小时</option>
+                  <option value="21600">6–12 小时</option>
+                  <option value="43200">12–24 小时</option>
+                  <option value="86400">24–48 小时</option>
+                </select>
+              </div>
+            </div>
+            <div class="result-block">
+              <div class="result-heading">
+                <h3>测试结果</h3>
+              </div>
+              <div id="result" class="result empty"><p>选择模型后点击“测试”。</p></div>
+              <details id="raw-event" class="raw-event hidden">
+                <summary>查看原始上游 response.completed 事件</summary>
+                <div class="raw-toolbar">
+                  <span>原始 JSON</span>
+                  <button id="copy-raw" class="button secondary small-button" type="button">复制 JSON</button>
+                </div>
+                <pre></pre>
+              </details>
+            </div>
+          </section>
+
+          <div class="side-stack">
+            <section class="panel quota-card" aria-live="polite">
+              <div class="quota-heading">
+                <h2>额度</h2>
+                <button id="refresh-quota" class="button secondary small-button" type="button">刷新</button>
+              </div>
+              <div id="quota-content" class="quota-content empty-quota"><span class="detail-glyph">—</span><span>选择账号后加载额度。</span></div>
+            </section>
+            <section class="panel heartbeat-panel">
+              <div class="heartbeat-heading">
+                <div class="heartbeat-title">
+                  <h2>心跳监测</h2>
+                  <button id="heartbeat-count" class="count-badge heartbeat-count-button" type="button" aria-label="管理心跳监测" title="管理监测" aria-expanded="false">0</button>
+                </div>
+                <button id="heartbeat-notifications-button" class="icon-button notification-button" type="button" aria-label="查看异常通知" title="异常通知" aria-expanded="false">
+                  <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M18 8a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9M10 21h4"/></svg>
+                  <span id="heartbeat-alert-count" class="notification-count hidden">0</span>
+                </button>
+              </div>
+              <div id="heartbeat-list" class="heartbeat-list" aria-live="polite" tabindex="0">
+                <div class="heartbeat-empty">尚未添加监测。</div>
+              </div>
+              <div id="heartbeat-pagination" class="heartbeat-pagination hidden" aria-label="心跳监测分页">
+                <span class="heartbeat-scroll-hint" aria-hidden="true">
+                  <svg viewBox="0 0 24 24"><rect x="7" y="2" width="10" height="17" rx="5"/><path d="M12 6v4"/></svg>
+                  <span>滚动切换</span>
+                </span>
+                <span id="heartbeat-page-dots" class="heartbeat-page-dots"></span>
+                <span id="heartbeat-page">0 / 0</span>
+              </div>
+            </section>
+          </div>
+        </div>
+      </section>
+    </main>
+  </div>
+  <section id="heartbeat-notifications" class="notification-popover hidden" aria-label="心跳异常通知">
+    <div class="notification-popover-heading">
+      <h2>异常通知</h2>
+      <button id="close-heartbeat-notifications" class="icon-button notification-close" type="button" aria-label="关闭异常通知">×</button>
+    </div>
+    <div id="heartbeat-notification-list" class="notification-list"></div>
+  </section>
+  <section id="heartbeat-manager" class="notification-popover heartbeat-manager hidden" aria-label="管理心跳监测">
+    <div class="notification-popover-heading">
+      <h2>管理监测</h2>
+      <button id="close-heartbeat-manager" class="icon-button notification-close" type="button" aria-label="关闭监测管理">×</button>
+    </div>
+    <div class="heartbeat-manager-toolbar">
+      <label><input id="heartbeat-select-all" type="checkbox">全选</label>
+      <button id="delete-selected-heartbeats" class="button small-button heartbeat-stop" type="button" disabled>删除所选</button>
+    </div>
+    <div id="heartbeat-manager-list" class="heartbeat-manager-list"></div>
+  </section>
+  <div id="toast" class="toast" role="status" aria-live="polite"></div>
+  <script src="/admin-ui/app.js" defer></script>
+</body>
+</html>

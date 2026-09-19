@@ -10,6 +10,7 @@ import (
 
 	"chatgpt-codex-proxy/internal/accounts"
 	"chatgpt-codex-proxy/internal/codex"
+	"chatgpt-codex-proxy/internal/codexauth"
 	"chatgpt-codex-proxy/internal/middleware"
 )
 
@@ -21,6 +22,52 @@ func (a *App) writeOpenAIError(c *gin.Context, status int, code, message, errTyp
 func (a *App) writeAdminError(c *gin.Context, status int, code, message string) {
 	middleware.SetRequestError(c, code, message)
 	c.AbortWithStatusJSON(status, gin.H{"error": code, "message": message})
+}
+
+func (a *App) writeAdminAccountError(c *gin.Context, accountID string, status int, code, message string, cause error) {
+	payload := gin.H{"error": code, "message": message}
+	if a.removeAdminCredentialFailure(accountID, cause) {
+		payload["account_removed"] = true
+	}
+	middleware.SetRequestError(c, code, message)
+	c.AbortWithStatusJSON(status, payload)
+}
+
+func (a *App) writeAdminUpstreamError(c *gin.Context, accountID string, cause error) {
+	status, code, message := a.classifyUpstreamError(accountID, cause)
+	payload := gin.H{"error": code, "message": message}
+	if a.removeAdminCredentialFailure(accountID, cause) {
+		payload["account_removed"] = true
+	}
+	var upstreamErr *codex.UpstreamError
+	if errors.As(cause, &upstreamErr) && upstreamErr.RetryAfter > 0 {
+		payload["retry_after_seconds"] = upstreamErr.RetryAfter
+	}
+	middleware.SetRequestError(c, code, message)
+	c.AbortWithStatusJSON(status, payload)
+}
+
+func (a *App) removeAdminCredentialFailure(accountID string, cause error) bool {
+	if !isAdminCredentialFailure(cause) {
+		return false
+	}
+	if err := a.accounts.Remove(accountID); err != nil {
+		a.logger.Error("remove expired admin account failed",
+			"account_id", accountID,
+			"error", err.Error(),
+		)
+		return false
+	}
+	a.removeHeartbeatsForAccount(accountID)
+	return true
+}
+
+func isAdminCredentialFailure(err error) bool {
+	var upstreamErr *codex.UpstreamError
+	if errors.As(err, &upstreamErr) && upstreamErr.StatusCode == http.StatusUnauthorized {
+		return true
+	}
+	return codexauth.IsTerminalCredentialFailure(err)
 }
 
 func (a *App) classifyUpstreamError(accountID string, err error) (int, string, string) {

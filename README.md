@@ -1,8 +1,8 @@
 <div align="center">
 
-# chatgpt-codex-proxy
+# Codex Backend Model Tester
 
-*Talk to ChatGPT Codex accounts using any OpenAI or Anthropic client.*
+*Verify which backend model a selected Codex account actually serves.*
 
 [![Go](https://img.shields.io/badge/Go-1.26+-00ADD8?style=flat&logo=go&logoColor=white)](https://go.dev)
 [![Docker](https://img.shields.io/badge/Deploy-Compose-2496ED?style=flat&logo=docker&logoColor=white)](https://docs.docker.com/compose/)
@@ -14,9 +14,11 @@
 ---
 
 ```bash
-cp .env.example .env          # set PROXY_API_KEY
-docker compose up -d --build  # or: go run ./cmd/api
+go run ./cmd/api  # opens the local model tester automatically
 ```
+
+For Docker or external API clients, copy `.env.example` to `.env` and set a
+stable `PROXY_API_KEY` before starting the service.
 
 Exposes OpenAI and Anthropic endpoints, translates each request into the private
 `chatgpt.com/backend-api/codex/*` format, and routes it across your logged-in
@@ -25,22 +27,49 @@ Codex accounts.
 The upstream API is private and undocumented, so it can change without notice.
 Built for local and small-scale use.
 
+## Project lineage
+
+This repository is based on [10/chatgpt-codex-proxy](https://github.com/10/chatgpt-codex-proxy),
+an MIT-licensed OpenAI- and Anthropic-compatible proxy. It retains the original
+proxy APIs and multi-account routing, while this fork adds a localhost-only
+model-testing UI, account-scoped model discovery, raw upstream model comparison,
+quota and heartbeat monitoring, OAuth logout, automatic browser startup, and
+Electron desktop packaging.
+
 ## Features
 
 - **Two API surfaces, one backend** — OpenAI Chat Completions, Responses, and Images plus Anthropic Messages.
 - **Streaming everywhere** — SSE, a persistent WebSocket for Responses, or plain JSON.
 - **Multi-account rotation** — least-used, round-robin, or sticky, with cooldowns and quota awareness.
 - **Device login** — add an account by opening a URL. No cookie scraping, no pasted tokens.
+- **Local model tester** — the embedded Web UI opens automatically and uses a localhost-only session, so it never asks for the proxy API key.
+- **Model heartbeat monitoring** — pin an account and model, choose a randomized interval from 1–10 minutes up to 24–48 hours, and receive a desktop notification on failure, mismatch, or recovery.
 - **Tools and structured output** — custom tools, legacy `functions`, `json_schema`, `json_object`.
 
 ## Quick Start
 
-Needs Docker or Go `1.26.8` or later, and a long random `PROXY_API_KEY`.
+The local model tester needs only Go `1.26.8` or later. No API key setup is
+required: when `PROXY_API_KEY` is absent, the process generates a private random
+key for its own localhost session and opens the browser automatically.
+
+Run it directly:
+
+```bash
+go run ./cmd/api
+```
+
+Only set a stable key when another OpenAI- or Anthropic-compatible client needs
+to call the proxy API:
 
 ```bash
 export PROXY_URL=http://localhost:8080
 export PROXY_API_KEY=change-me-to-a-long-random-string
 ```
+
+The model tester opens automatically at
+`http://127.0.0.1:8080/`. The browser UI does not receive or store
+`PROXY_API_KEY`; the backend issues it a process-local, HttpOnly session cookie.
+Set `OPEN_BROWSER=false` for a server, container, or headless environment.
 
 Add an account — start a device login, open the returned `auth_url`, then poll
 until `status` is `ready`:
@@ -75,8 +104,10 @@ export ANTHROPIC_MODEL=gpt-6-astra
 
 Use a model ID from `GET /v1/models`; the default is `gpt-6-astra`.
 
-Every route except `GET /health/live` needs the key, as either
-`Authorization: Bearer <key>` or `X-API-Key: <key>`.
+Public API routes and external admin API calls need the key, as either
+`Authorization: Bearer <key>` or `X-API-Key: <key>`. The embedded admin UI is
+available only from localhost and authenticates its own same-origin requests
+with an HttpOnly session cookie.
 
 ## API
 
@@ -111,12 +142,25 @@ GET    /admin/accounts
 POST   /admin/accounts/device-login/start
 GET    /admin/accounts/device-login/:login_id
 DELETE /admin/accounts/:account_id
+POST   /admin/accounts/:account_id/logout
 PATCH  /admin/accounts/:account_id
 GET    /admin/accounts/:account_id/usage
 POST   /admin/accounts/:account_id/refresh
+GET    /admin/accounts/:account_id/models
+POST   /admin/model-test
+GET    /admin/heartbeats
+POST   /admin/heartbeats
+POST   /admin/heartbeats/:heartbeat_id/run
+DELETE /admin/heartbeats/:heartbeat_id
+POST   /admin/notifications/test
 GET    /admin/rotation
 PUT    /admin/rotation
 ```
+
+POST /admin/accounts/:account_id/logout revokes the account's upstream OAuth
+refresh and access tokens before removing its local credentials. If revocation
+fails, local credentials are kept so the operation can be retried.
+DELETE /admin/accounts/:account_id only removes local credentials.
 
 Rotation is `least_used`, `round_robin`, or `sticky`. An account is skipped when
 its status is `disabled`, `expired`, or `banned`, a cooldown is active, its
@@ -138,11 +182,38 @@ docker compose up -d --build
 docker compose logs -f
 ```
 
-Config is environment-only: `PROXY_API_KEY` (required), `PORT` (`8080`),
-`DATA_DIR` (`data`, or `/app/data` in Docker), `DEBUG_LOG_PAYLOADS` (`false`).
+Config is environment-only: `PROXY_API_KEY` (optional for direct local runs;
+Docker Compose intentionally requires a stable value), `PORT` (`8080`),
+`DATA_DIR` (`data`, or `/app/data` in Docker), `DEBUG_LOG_PAYLOADS` (`false`),
+and `OPEN_BROWSER` (`true` for direct runs, disabled by the Docker config).
+
+## Desktop packages
+
+The `desktop` directory wraps the embedded Web UI in a real Electron window.
+Windows builds install through NSIS and stay available from the system tray;
+closing the window hides it, while the tray `退出` action also shuts down the Go
+backend. macOS builds are standard `.app` bundles packaged as ZIP or DMG and use
+the same menu-bar lifecycle. Runtime credentials are stored under Electron's
+per-user application data directory, never inside the installation directory.
+Desktop packaging requires Node.js 24 with npm in addition to the Go version
+listed above.
+
+```bash
+cd desktop
+npm ci
+npm run icon
+npm run dist:win         # Windows x64 NSIS installer
+npm run dist:mac         # universal macOS DMG + ZIP; run on macOS
+```
+
+Unsigned local builds can trigger Windows SmartScreen or macOS Gatekeeper. The
+native DMG build requires macOS; `.github/workflows/desktop-release.yml` runs it
+on a macOS runner.
 
 `${DATA_DIR}` holds `accounts.json` — accounts, OAuth tokens, labels, status,
-quota, cooldowns — and `models-cache.json`. Continuation state and in-flight
+quota, cooldowns — `models-cache.json`, and `heartbeats.json`. Heartbeats choose
+from 40 lightweight prompts and randomly schedule within the range selected in the UI.
+They never rotate to another account and only notify when health changes. Continuation state and in-flight
 device logins are memory-only and do not survive a restart.
 
 ## How It Works

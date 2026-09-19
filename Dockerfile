@@ -31,6 +31,7 @@ COPY --from=build /out/chatgpt-codex-proxy /usr/local/bin/chatgpt-codex-proxy
 
 ENV PORT=8080
 ENV DATA_DIR=/app/data
+ENV OPEN_BROWSER=false
 ENV GIN_MODE=release
 
 EXPOSE 8080

@@ -24,6 +24,7 @@ const (
 	deviceUserCodePath = "/api/accounts/deviceauth/usercode"
 	deviceTokenPath    = "/api/accounts/deviceauth/token"
 	oauthTokenPath     = "/oauth/token"
+	oauthRevokePath    = "/api/accounts/oauth/revoke"
 	deviceAuthPath     = "/codex/device"
 	deviceRedirectPath = "/deviceauth/callback"
 )
@@ -174,6 +175,36 @@ func (s *OAuthService) Refresh(ctx context.Context, existing accounts.OAuthToken
 	return nextToken, nextAccountID, nil
 }
 
+func (s *OAuthService) Revoke(ctx context.Context, token accounts.OAuthToken) error {
+	endpoint := strings.TrimRight(s.cfg.AuthIssuer, "/") + oauthRevokePath
+	candidates := []struct {
+		value string
+		hint  string
+	}{
+		{value: strings.TrimSpace(token.RefreshToken), hint: "refresh_token"},
+		{value: strings.TrimSpace(token.AccessToken), hint: "access_token"},
+	}
+	seen := make(map[string]struct{}, len(candidates))
+	for _, candidate := range candidates {
+		if candidate.value == "" {
+			continue
+		}
+		if _, ok := seen[candidate.value]; ok {
+			continue
+		}
+		seen[candidate.value] = struct{}{}
+
+		values := url.Values{}
+		values.Set("token", candidate.value)
+		values.Set("token_type_hint", candidate.hint)
+		values.Set("client_id", s.cfg.OAuthClientID)
+		if err := doRevokeForm(ctx, s.client, endpoint, values, s.defaultHeaders()); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
 func buildOAuthToken(raw oauthTokenResponse) accounts.OAuthToken {
 	expiresIn := int64(3600)
 	if value, ok := raw.ExpiresIn.Int64(); ok {
@@ -240,6 +271,27 @@ func doDeviceAuthJSON[T any](ctx context.Context, client *http.Client, endpoint 
 		return zero, false, err
 	}
 	return decoded, false, nil
+}
+
+func doRevokeForm(ctx context.Context, client *http.Client, endpoint string, values url.Values, headers http.Header) error {
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, endpoint, strings.NewReader(values.Encode()))
+	if err != nil {
+		return err
+	}
+	req.Header = headers.Clone()
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	resp, err := client.Do(req)
+	if err != nil {
+		return err
+	}
+	defer resp.Body.Close()
+	if _, err := io.Copy(io.Discard, io.LimitReader(resp.Body, httpbody.Limit)); err != nil {
+		return fmt.Errorf("drain oauth revocation response: %w", err)
+	}
+	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
+		return fmt.Errorf("oauth token revocation failed with status %d", resp.StatusCode)
+	}
+	return nil
 }
 
 func doForm(ctx context.Context, client *http.Client, endpoint string, values url.Values, headers http.Header) (oauthTokenResponse, error) {

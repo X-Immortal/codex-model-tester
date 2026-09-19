@@ -33,6 +33,7 @@ The auth endpoints in active use are:
 - `POST /api/accounts/deviceauth/usercode`
 - `POST /api/accounts/deviceauth/token`
 - `POST /oauth/token`
+- `POST /api/accounts/oauth/revoke`
 
 ## Base URLs
 
@@ -1218,7 +1219,7 @@ The proxy also extracts retry timing from:
 
 ## Auth and Device Login Endpoints
 
-These are not part of the private Codex backend itself, but they are required to obtain and refresh the tokens used against it.
+These are not part of the private Codex backend itself, but they are required to obtain, refresh, and revoke the tokens used against it.
 
 ## POST /api/accounts/deviceauth/usercode
 
@@ -1401,6 +1402,21 @@ curl -sS -X POST "${AUTH_BASE_URL}/oauth/token" \
   --data-urlencode "client_id=app_EMoamEEZ73f0CkXaXp7hrann"
 ```
 
+## POST /api/accounts/oauth/revoke
+
+Revokes an OAuth token for account logout. The endpoint is published by the
+auth issuer's OpenID Connect metadata as its revocation endpoint.
+
+The proxy sends an application/x-www-form-urlencoded POST containing:
+
+- token: the refresh or access token
+- token_type_hint: refresh_token or access_token
+- client_id: the configured public OAuth client ID
+
+The refresh token is revoked first, followed by the access token. The local
+account record is removed only after both revocation requests succeed. A
+non-2xx response keeps the local credentials so logout can be retried.
+
 Recognized JWT claim locations:
 
 - top-level `chatgpt_account_id`
@@ -1442,6 +1458,7 @@ These claims are read from tokens by the proxy:
 - `POST /api/accounts/deviceauth/usercode`
 - `POST /api/accounts/deviceauth/token`
 - `POST /oauth/token`
+- `POST /api/accounts/oauth/revoke`
 
 ### Upstream read paths
 

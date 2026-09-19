@@ -37,14 +37,33 @@ func (a *App) routes() {
 	protected.POST("/v1/messages", a.handleAnthropicMessages)
 	protected.POST("/v1/messages/count_tokens", a.handleAnthropicCountTokens)
 
-	adminGroup := protected.Group("/admin")
+	adminGroup := a.engine.Group("/admin")
+	adminGroup.Use(a.adminUIAuthentication())
 	adminGroup.GET("/accounts", a.handleAdminAccounts)
 	adminGroup.POST("/accounts/device-login/start", a.handleAdminDeviceLoginStart)
 	adminGroup.GET("/accounts/device-login/:login_id", a.handleAdminDeviceLoginGet)
+	adminGroup.DELETE("/accounts/device-login/:login_id", a.handleAdminDeviceLoginCancel)
 	adminGroup.DELETE("/accounts/:account_id", a.handleAdminAccountDelete)
+	adminGroup.POST("/accounts/:account_id/logout", a.handleAdminAccountLogout)
+	adminGroup.GET("/accounts/:account_id/models", a.handleAdminAccountModels)
 	adminGroup.PATCH("/accounts/:account_id", a.handleAdminAccountPatch)
 	adminGroup.GET("/accounts/:account_id/usage", a.handleAdminAccountUsage)
 	adminGroup.POST("/accounts/:account_id/refresh", a.handleAdminAccountRefresh)
+	adminGroup.POST("/model-test", a.handleAdminModelTest)
+	adminGroup.GET("/heartbeats", a.handleAdminHeartbeats)
+	adminGroup.POST("/heartbeats", a.handleAdminHeartbeatUpsert)
+	adminGroup.POST("/heartbeats/:heartbeat_id/run", a.handleAdminHeartbeatRun)
+	adminGroup.DELETE("/heartbeats/:heartbeat_id", a.handleAdminHeartbeatDelete)
+	adminGroup.POST("/notifications/test", a.handleAdminNotificationTest)
 	adminGroup.GET("/rotation", a.handleAdminRotationGet)
 	adminGroup.PUT("/rotation", a.handleAdminRotationPut)
+	a.engine.NoRoute(func(c *gin.Context) {
+		if c.Request.Method == http.MethodGet {
+			switch c.Request.URL.Path {
+			case "/", "/admin/ui", "/admin-ui/app.js", "/admin-ui/style.css":
+				c.Status(http.StatusOK)
+			}
+		}
+		a.handleAdminUI(c.Writer, c.Request)
+	})
 }

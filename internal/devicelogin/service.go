@@ -22,6 +22,7 @@ type pendingLogin struct {
 	DeviceLoginRecord
 	DeviceAuthID string
 	Interval     time.Duration
+	cancel       context.CancelFunc
 }
 
 func NewDeviceLoginService(oauth *codexauth.OAuthService, accountsSvc *accounts.Service, timeout time.Duration) *DeviceLoginService {
@@ -52,12 +53,14 @@ func (s *DeviceLoginService) Start(ctx context.Context) (DeviceLoginRecord, erro
 		DeviceAuthID: resp.DeviceAuthID,
 		Interval:     time.Duration(max(resp.Interval, 5)) * time.Second,
 	}
+	pollContext, cancel := context.WithDeadline(context.Background(), login.ExpiresAt)
+	login.cancel = cancel
 
 	s.mu.Lock()
 	s.logins[login.LoginID] = login
 	s.mu.Unlock()
 
-	go s.poll(login)
+	go s.poll(pollContext, login)
 
 	return login.DeviceLoginRecord, nil
 }
@@ -72,18 +75,17 @@ func (s *DeviceLoginService) Get(loginID string) (DeviceLoginRecord, bool) {
 	return login.DeviceLoginRecord, true
 }
 
-func (s *DeviceLoginService) poll(login *pendingLogin) {
-	ctx, cancel := context.WithDeadline(context.Background(), login.ExpiresAt)
-	defer cancel()
-
-	ticks := time.Tick(login.Interval)
+func (s *DeviceLoginService) poll(ctx context.Context, login *pendingLogin) {
+	defer login.cancel()
+	ticker := time.NewTicker(login.Interval)
+	defer ticker.Stop()
 
 	for {
 		select {
 		case <-ctx.Done():
 			s.setStatus(login.LoginID, DeviceLoginPending, DeviceLoginExpired, "device login expired")
 			return
-		case <-ticks:
+		case <-ticker.C:
 			result, err := s.oauth.PollDeviceCode(ctx, login.DeviceAuthID, login.UserCode)
 			if err != nil {
 				text := strings.ToLower(err.Error())
@@ -117,6 +119,20 @@ func (s *DeviceLoginService) poll(login *pendingLogin) {
 			return
 		}
 	}
+}
+
+func (s *DeviceLoginService) Cancel(loginID string) bool {
+	s.mu.Lock()
+	login, ok := s.logins[loginID]
+	if ok {
+		delete(s.logins, loginID)
+	}
+	s.mu.Unlock()
+	if !ok {
+		return false
+	}
+	login.cancel()
+	return true
 }
 
 func (s *DeviceLoginService) setStatus(loginID string, expected, status DeviceLoginStatus, message string) {

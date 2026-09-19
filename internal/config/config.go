@@ -1,6 +1,8 @@
 package config
 
 import (
+	"crypto/rand"
+	"encoding/base64"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -11,10 +13,19 @@ import (
 	"github.com/joho/godotenv"
 )
 
+func generateProxyAPIKey() (string, error) {
+	secret := make([]byte, 32)
+	if _, err := rand.Read(secret); err != nil {
+		return "", fmt.Errorf("generate proxy API key: %w", err)
+	}
+	return base64.RawURLEncoding.EncodeToString(secret), nil
+}
+
 type Config struct {
 	ListenAddr       string
 	DataDir          string
 	ProxyAPIKey      string
+	OpenBrowser      bool
 	DebugLogPayloads bool
 	DefaultModel     string
 	CodexBaseURL     string
@@ -59,11 +70,27 @@ func Load() (Config, error) {
 			return Config{}, fmt.Errorf("DEBUG_LOG_PAYLOADS must be a boolean")
 		}
 	}
+	openBrowser := true
+	if raw := strings.TrimSpace(os.Getenv("OPEN_BROWSER")); raw != "" {
+		var err error
+		openBrowser, err = strconv.ParseBool(raw)
+		if err != nil {
+			return Config{}, fmt.Errorf("OPEN_BROWSER must be a boolean")
+		}
+	}
+	proxyAPIKey := strings.TrimSpace(os.Getenv("PROXY_API_KEY"))
+	if proxyAPIKey == "" {
+		proxyAPIKey, err = generateProxyAPIKey()
+		if err != nil {
+			return Config{}, err
+		}
+	}
 
 	cfg := Config{
 		ListenAddr:       ":" + strconv.Itoa(portNumber),
 		DataDir:          dataDir,
-		ProxyAPIKey:      strings.TrimSpace(os.Getenv("PROXY_API_KEY")),
+		ProxyAPIKey:      proxyAPIKey,
+		OpenBrowser:      openBrowser,
 		DebugLogPayloads: debugLogPayloads,
 		DefaultModel:     "gpt-6-astra",
 		CodexBaseURL:     "https://chatgpt.com/backend-api",
@@ -73,10 +100,6 @@ func Load() (Config, error) {
 		ContinuationTTL:  time.Hour,
 		RequestTimeout:   30 * time.Minute,
 		RefreshSkew:      time.Minute,
-	}
-
-	if cfg.ProxyAPIKey == "" {
-		return Config{}, fmt.Errorf("PROXY_API_KEY must be set")
 	}
 
 	if err := os.MkdirAll(cfg.DataDir, 0o755); err != nil {

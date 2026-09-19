@@ -93,11 +93,51 @@ func (a *App) handleAdminDeviceLoginGet(c *gin.Context) {
 	c.JSON(http.StatusOK, record)
 }
 
+func (a *App) handleAdminDeviceLoginCancel(c *gin.Context) {
+	if !a.deviceLogins.Cancel(c.Param("login_id")) {
+		a.writeAdminError(c, http.StatusNotFound, "login_not_found", "device login not found")
+		return
+	}
+	c.Status(http.StatusNoContent)
+}
+
 func (a *App) handleAdminAccountDelete(c *gin.Context) {
-	if err := a.accounts.Remove(c.Param("account_id")); err != nil {
+	accountID := c.Param("account_id")
+	if err := a.accounts.Remove(accountID); err != nil {
 		a.writeAdminError(c, http.StatusNotFound, "account_not_found", err.Error())
 		return
 	}
+	a.removeHeartbeatsForAccount(accountID)
+	c.Status(http.StatusNoContent)
+}
+
+func (a *App) handleAdminAccountLogout(c *gin.Context) {
+	accountID := c.Param("account_id")
+	record, ok, err := a.accounts.Get(accountID)
+	if err != nil {
+		a.writeAdminError(c, http.StatusInternalServerError, "account_lookup_failed", err.Error())
+		return
+	}
+	if !ok {
+		a.writeAdminError(c, http.StatusNotFound, "account_not_found", "account not found")
+		return
+	}
+	if a.revokeOAuth == nil {
+		a.writeAdminError(c, http.StatusInternalServerError, "logout_unavailable", "OAuth logout is not configured")
+		return
+	}
+	if err := a.revokeOAuth(c.Request.Context(), record.Token); err != nil {
+		if a.logger != nil {
+			a.logger.Warn("revoke account OAuth session failed", "account_id", accountID, "error", err.Error())
+		}
+		a.writeAdminError(c, http.StatusBadGateway, "logout_failed", "failed to revoke the upstream OAuth session; local credentials were kept")
+		return
+	}
+	if err := a.accounts.Remove(accountID); err != nil {
+		a.writeAdminError(c, http.StatusInternalServerError, "logout_cleanup_failed", "OAuth session was revoked but local credentials could not be removed")
+		return
+	}
+	a.removeHeartbeatsForAccount(accountID)
 	c.Status(http.StatusNoContent)
 }
 
@@ -143,7 +183,11 @@ func (a *App) handleAdminAccountUsage(c *gin.Context) {
 			a.writeAdminError(c, http.StatusNotFound, "account_not_found", err.Error())
 			return
 		}
-		a.writeAdminError(c, http.StatusBadGateway, "usage_lookup_failed", err.Error())
+		if isAdminCredentialFailure(err) {
+			a.writeAdminUpstreamError(c, c.Param("account_id"), err)
+		} else {
+			a.writeAdminAccountError(c, c.Param("account_id"), http.StatusBadGateway, "usage_lookup_failed", err.Error(), err)
+		}
 		return
 	}
 	eligibleNow, err := a.accounts.EligibleNow(record.ID)

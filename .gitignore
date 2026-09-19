@@ -24,3 +24,12 @@ tmp*
 .gocache*
 .codex*
 .claude*
+
+# Desktop packaging output
+dist/
+desktop/backend/
+desktop/.backend-tmp/
+desktop/node_modules/
+
+# macOS Finder metadata
+.DS_Store

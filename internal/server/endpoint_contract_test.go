@@ -150,6 +150,14 @@ func TestAdminEndpointLifecycle(t *testing.T) {
 	if len(listed) != 2 {
 		t.Fatalf("device login saved %d accounts, want 2", len(listed))
 	}
+	cancellable := request("POST", "/admin/accounts/device-login/start", "{}", 200)
+	cancellableID, _ := cancellable["login_id"].(string)
+	if cancellableID == "" {
+		t.Fatal("cancellable device login did not start")
+	}
+	request("DELETE", "/admin/accounts/device-login/"+cancellableID, "", 204)
+	request("GET", "/admin/accounts/device-login/"+cancellableID, "", 404)
+	request("DELETE", "/admin/accounts/device-login/"+cancellableID, "", 404)
 	request("DELETE", "/admin/accounts/acct_fixture", "", 204)
 	if _, ok, err := svc.Get("acct_fixture"); err != nil || ok {
 		t.Fatal("deleted account remains in store")

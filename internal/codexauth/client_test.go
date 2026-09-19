@@ -167,6 +167,74 @@ func TestExtractAccountIDReadsJWTClaims(t *testing.T) {
 	}
 }
 
+func TestRevokeRevokesRefreshThenAccessToken(t *testing.T) {
+	t.Parallel()
+
+	var calls []map[string]string
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != oauthRevokePath {
+			t.Errorf("path = %q, want %q", r.URL.Path, oauthRevokePath)
+		}
+		if err := r.ParseForm(); err != nil {
+			t.Errorf("ParseForm() error = %v", err)
+			w.WriteHeader(http.StatusBadRequest)
+			return
+		}
+		calls = append(calls, map[string]string{
+			"token":           r.Form.Get("token"),
+			"token_type_hint": r.Form.Get("token_type_hint"),
+			"client_id":       r.Form.Get("client_id"),
+		})
+		w.WriteHeader(http.StatusNoContent)
+	}))
+	defer server.Close()
+
+	service := NewOAuthService(config.Config{
+		AuthIssuer:     server.URL,
+		OAuthClientID:  "test-client",
+		RequestTimeout: time.Second,
+	})
+	err := service.Revoke(context.Background(), accounts.OAuthToken{
+		AccessToken:  "access-secret",
+		RefreshToken: "refresh-secret",
+	})
+	if err != nil {
+		t.Fatalf("Revoke() error = %v", err)
+	}
+	if len(calls) != 2 {
+		t.Fatalf("revocation calls = %d, want 2", len(calls))
+	}
+	if calls[0]["token"] != "refresh-secret" || calls[0]["token_type_hint"] != "refresh_token" {
+		t.Fatalf("first revocation = %#v, want refresh token", calls[0])
+	}
+	if calls[1]["token"] != "access-secret" || calls[1]["token_type_hint"] != "access_token" {
+		t.Fatalf("second revocation = %#v, want access token", calls[1])
+	}
+	for _, call := range calls {
+		if call["client_id"] != "test-client" {
+			t.Fatalf("client_id = %q, want test-client", call["client_id"])
+		}
+	}
+}
+
+func TestRevokeReturnsErrorForUpstreamFailure(t *testing.T) {
+	t.Parallel()
+
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		http.Error(w, "upstream failure", http.StatusBadGateway)
+	}))
+	defer server.Close()
+
+	service := NewOAuthService(config.Config{AuthIssuer: server.URL, RequestTimeout: time.Second})
+	err := service.Revoke(context.Background(), accounts.OAuthToken{RefreshToken: "refresh-secret"})
+	if err == nil || !strings.Contains(err.Error(), "status 502") {
+		t.Fatalf("Revoke() error = %v, want status 502", err)
+	}
+	if strings.Contains(err.Error(), "refresh-secret") {
+		t.Fatal("Revoke() error exposed token")
+	}
+}
+
 func makeJWT(payload string) string {
 	header := base64.RawURLEncoding.EncodeToString([]byte(`{"alg":"none","typ":"JWT"}`))
 	body := base64.RawURLEncoding.EncodeToString([]byte(payload))
