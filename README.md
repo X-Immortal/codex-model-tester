@@ -246,8 +246,12 @@ tools shipped with macOS. `VERSION`, `ARCHS` (e.g. `ARCHS=arm64`), and
 `SKIP_DMG=1` override the defaults.
 
 The bundle is ad-hoc signed, so a copy downloaded from the internet is
-quarantined and Gatekeeper refuses the first launch. Right-click the app and
-choose `Open`, or clear the quarantine flag:
+quarantined and Gatekeeper may block the first launch. If double-clicking shows
+the malware-verification warning, close it, open **System Settings → Privacy &
+Security**, scroll to the **Security** section, and click **Open Anyway** next
+to the Codex Model Tester message. Confirm **Open** in the next dialog, then
+launch the app again. The button only appears after macOS has blocked one
+launch attempt. As a terminal fallback, clear the quarantine flag:
 
 ```bash
 xattr -dr com.apple.quarantine "/Applications/Codex Model Tester.app"
