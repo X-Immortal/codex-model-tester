@@ -211,6 +211,45 @@ Unsigned builds can trigger Windows SmartScreen. The
 `.github/workflows/windows-release.yml` workflow produces the same portable
 executable for version tags and manual runs.
 
+## macOS application
+
+The macOS release is a `.app` bundle containing the same Go backend and
+embedded Web UI, distributed inside a `.dmg`. Drag it to `Applications` and
+double-click it: the local service starts, the tester opens in the default
+browser, and the app keeps running as a menu bar item with no Dock icon or
+window. Click the menu bar icon to reopen the page with `打开网页`, or stop the
+backend with `退出`. Like the Windows build it needs no Node.js, no Electron,
+and no manually configured proxy API key. Launching it again while it is
+already running reuses the running instance: the second launch opens the
+existing Web UI and exits without starting a second backend.
+
+By default, runtime data is stored in
+`~/Library/Application Support/Codex Backend Model Tester/data`, not beside the
+bundle — a `.app` launched from Finder starts with `/` as its working
+directory. An explicit `DATA_DIR` still takes precedence.
+
+Build the bundle on macOS:
+
+```bash
+scripts/build-macos-app.sh
+```
+
+That produces a universal (arm64 + x86_64) `dist/Codex Model Tester.app` and
+`dist/Codex-Model-Tester-macos-universal.dmg`, using only the Go toolchain and
+tools shipped with macOS. `VERSION`, `ARCHS` (e.g. `ARCHS=arm64`), and
+`SKIP_DMG=1` override the defaults.
+
+The bundle is ad-hoc signed, so a copy downloaded from the internet is
+quarantined and Gatekeeper refuses the first launch. Right-click the app and
+choose `Open`, or clear the quarantine flag:
+
+```bash
+xattr -dr com.apple.quarantine "/Applications/Codex Model Tester.app"
+```
+
+The `.github/workflows/macos-release.yml` workflow produces the same `.dmg`
+for version tags and manual runs.
+
 `${DATA_DIR}` holds `accounts.json` — accounts, OAuth tokens, labels, status,
 quota, cooldowns — `models-cache.json`, and `heartbeats.json`. Heartbeats choose
 from 40 lightweight prompts and randomly schedule within the range selected in the UI.
@@ -252,6 +291,7 @@ chatgpt-codex-proxy/
 │   ├── models/               # runtime model catalog
 │   ├── middleware/           # authentication and request logging
 │   └── config/               # environment configuration
+├── scripts/                  # macOS .app and .dmg packaging
 ├── test/integration/         # live compatibility suite
 └── docs/                     # upstream and translation references
 ```

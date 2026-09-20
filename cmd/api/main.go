@@ -25,6 +25,22 @@ func main() {
 		os.Exit(1)
 	}
 
+	releaseInstanceLock, alreadyRunning, err := acquireApplicationLock(cfg.DataDir)
+	if err != nil {
+		slog.Error("failed to acquire application instance lock", "error", err)
+		showFatalError("Codex Model Tester 启动失败", err)
+		os.Exit(1)
+	}
+	if alreadyRunning {
+		if url, urlErr := adminUIURL(cfg.ListenAddr); urlErr != nil {
+			slog.Warn("running instance found, but its URL could not be resolved", "error", urlErr)
+		} else if browserErr := openBrowser(url); browserErr != nil {
+			slog.Warn("running instance found, but opening its UI failed", "url", url, "error", browserErr)
+		}
+		return
+	}
+	defer releaseInstanceLock()
+
 	logger := slog.New(slog.NewJSONHandler(os.Stdout, nil))
 	slog.SetDefault(logger)
 
