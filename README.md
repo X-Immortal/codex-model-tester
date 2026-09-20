@@ -221,8 +221,9 @@ executable for version tags and manual runs.
 The macOS release is a `.app` bundle containing the same Go backend and
 embedded Web UI, distributed inside a `.dmg`. Drag it to `Applications` and
 double-click it: the local service starts, the tester opens in the default
-browser, and the app keeps running as a menu bar item with no Dock icon or
-window. Click the menu bar icon to reopen the page with `打开网页`, or stop the
+browser, and the app keeps running in both the menu bar and the Dock. The Dock
+icon shows the normal running indicator (a small dot); click it to reopen the
+Web UI. You can also click the menu bar icon and choose `打开网页`, or stop the
 backend with `退出`. Like the Windows build it needs no Node.js, no Electron,
 and no manually configured proxy API key. Launching it again while it is
 already running reuses the running instance: the second launch opens the

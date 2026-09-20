@@ -79,7 +79,7 @@ cat > "$APP/Contents/Info.plist" <<PLIST
   <key>LSApplicationCategoryType</key><string>public.app-category.developer-tools</string>
   <key>LSMinimumSystemVersion</key><string>11.0</string>
   <key>NSHighResolutionCapable</key><true/>
-  <key>LSUIElement</key><true/>
+  <key>LSUIElement</key><false/>
   <key>NSHumanReadableCopyright</key><string>MIT licensed. See the bundled NOTICE.</string>
 </dict>
 </plist>

@@ -9,6 +9,8 @@ import (
 	"sync"
 
 	"github.com/gogpu/systray"
+
+	"chatgpt-codex-proxy/internal/macosdock"
 )
 
 //go:embed tray_icon_template.png
@@ -44,6 +46,8 @@ func waitForApplicationExit(ctx context.Context, requestShutdown context.CancelF
 		SetTooltip("Codex Backend Model Tester").
 		SetMenu(menu).
 		Show()
+	dockCleanup := macosdock.Setup(openUI)
+	defer dockCleanup()
 
 	go func() {
 		<-ctx.Done()
