@@ -3,8 +3,10 @@ package codex
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"io"
 	"net/http"
+	"net/url"
 	"strings"
 
 	"github.com/gorilla/websocket"
@@ -19,7 +21,21 @@ type WSStream struct {
 }
 
 func ConnectWS(ctx context.Context, endpoint string, headers http.Header, body any) (*WSStream, error) {
+	return ConnectWSWithProxy(ctx, endpoint, headers, body, "")
+}
+
+func ConnectWSWithProxy(ctx context.Context, endpoint string, headers http.Header, body any, proxyURL string) (*WSStream, error) {
 	dialer := websocket.Dialer{}
+	if proxyURL != "" {
+		parsed, err := url.Parse(proxyURL)
+		if err != nil {
+			return nil, fmt.Errorf("parse upstream proxy: %w", err)
+		}
+		if parsed.Scheme != "http" && parsed.Scheme != "https" {
+			return nil, fmt.Errorf("websocket proxy scheme %q is not supported; use an HTTP proxy", parsed.Scheme)
+		}
+		dialer.Proxy = http.ProxyURL(parsed)
+	}
 	conn, resp, err := dialer.DialContext(ctx, endpoint, headers)
 	if err != nil {
 		if resp != nil {

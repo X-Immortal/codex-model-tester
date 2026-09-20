@@ -160,6 +160,9 @@ func (c *HTTPClient) sessionFor(accountID string) *httpcloak.Client {
 		httpcloak.WithDisableHTTP3(),
 		httpcloak.WithoutRetry(),
 	)
+	if c.cfg.UpstreamProxy != "" {
+		session.SetProxy(c.cfg.UpstreamProxy)
+	}
 	c.sessions[accountID] = session
 	return session
 }

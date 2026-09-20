@@ -43,7 +43,7 @@ func (a *App) connectResponsesWebSocket(ctx context.Context, endpoint string, he
 	if a.wsConnector != nil {
 		return a.wsConnector(ctx, endpoint, headers, body)
 	}
-	return codex.ConnectWS(ctx, endpoint, headers, body)
+	return codex.ConnectWSWithProxy(ctx, endpoint, headers, body, a.cfg.UpstreamProxy)
 }
 
 func (a *App) handleResponsesWebSocket(c *gin.Context) {

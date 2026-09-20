@@ -24,6 +24,7 @@ func generateProxyAPIKey() (string, error) {
 type Config struct {
 	ListenAddr       string
 	DataDir          string
+	UpstreamProxy    string
 	ProxyAPIKey      string
 	OpenBrowser      bool
 	DebugLogPayloads bool
@@ -89,6 +90,7 @@ func Load() (Config, error) {
 	cfg := Config{
 		ListenAddr:       ":" + strconv.Itoa(portNumber),
 		DataDir:          dataDir,
+		UpstreamProxy:    resolveUpstreamProxy(),
 		ProxyAPIKey:      proxyAPIKey,
 		OpenBrowser:      openBrowser,
 		DebugLogPayloads: debugLogPayloads,

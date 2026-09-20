@@ -185,7 +185,12 @@ docker compose logs -f
 Config is environment-only: `PROXY_API_KEY` (optional for direct local runs;
 Docker Compose intentionally requires a stable value), `PORT` (`8080`),
 `DATA_DIR` (`data`, or `/app/data` in Docker), `DEBUG_LOG_PAYLOADS` (`false`),
-and `OPEN_BROWSER` (`true` for direct runs, disabled by the Docker config).
+`OPEN_BROWSER` (`true` for direct runs, disabled by the Docker config), and
+`UPSTREAM_PROXY` (optional explicit HTTP/HTTPS proxy for upstream requests).
+When `UPSTREAM_PROXY` is unset, the app uses `HTTPS_PROXY`/`HTTP_PROXY` and, on
+macOS, falls back to the HTTP/HTTPS proxy configured in System Settings. The
+same proxy is used for OAuth account login, Codex HTTP/SSE requests, and
+upstream WebSocket connections.
 
 ## Windows application
 

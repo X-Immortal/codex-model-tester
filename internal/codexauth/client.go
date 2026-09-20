@@ -101,10 +101,17 @@ type OAuthService struct {
 }
 
 func NewOAuthService(cfg config.Config) *OAuthService {
+	transport := http.DefaultTransport.(*http.Transport).Clone()
+	if cfg.UpstreamProxy != "" {
+		if proxyURL, err := url.Parse(cfg.UpstreamProxy); err == nil && (proxyURL.Scheme == "http" || proxyURL.Scheme == "https") {
+			transport.Proxy = http.ProxyURL(proxyURL)
+		}
+	}
 	return &OAuthService{
 		cfg: cfg,
 		client: &http.Client{
-			Timeout: cfg.RequestTimeout,
+			Transport: transport,
+			Timeout:   cfg.RequestTimeout,
 		},
 	}
 }
