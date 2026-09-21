@@ -9,8 +9,14 @@ import (
 	"chatgpt-codex-proxy/internal/middleware"
 )
 
+// ServiceIdentity names this application in the liveness payload. The desktop
+// launcher uses it to tell "our own backend already owns this port" apart from
+// "an unrelated program grabbed the port".
+const ServiceIdentity = "codex-model-tester"
+
 type healthResponse struct {
 	Status          string                    `json:"status"`
+	Service         string                    `json:"service,omitempty"`
 	Accounts        int                       `json:"accounts,omitempty"`
 	Rotation        accounts.RotationStrategy `json:"rotation,omitempty"`
 	Continuations   bool                      `json:"continuations,omitempty"`
@@ -22,7 +28,7 @@ type healthResponse struct {
 }
 
 func (a *App) handleHealthLive(c *gin.Context) {
-	c.JSON(http.StatusOK, healthResponse{Status: "ok"})
+	c.JSON(http.StatusOK, healthResponse{Status: "ok", Service: ServiceIdentity})
 }
 
 func (a *App) handleHealth(c *gin.Context) {
@@ -37,6 +43,7 @@ func (a *App) handleHealth(c *gin.Context) {
 	}
 	c.JSON(http.StatusOK, healthResponse{
 		Status:          "ok",
+		Service:         ServiceIdentity,
 		Accounts:        len(records),
 		Rotation:        a.accounts.RotationStrategy(),
 		Continuations:   true,

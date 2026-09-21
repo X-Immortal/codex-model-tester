@@ -25,24 +25,28 @@ func main() {
 		os.Exit(1)
 	}
 
+	logger := slog.New(slog.NewJSONHandler(os.Stdout, nil))
+	slog.SetDefault(logger)
+
 	releaseInstanceLock, alreadyRunning, err := acquireApplicationLock(cfg.DataDir)
 	if err != nil {
-		slog.Error("failed to acquire application instance lock", "error", err)
+		logger.Error("failed to acquire application instance lock", "error", err)
 		showFatalError("Codex Model Tester 启动失败", err)
 		os.Exit(1)
 	}
 	if alreadyRunning {
-		if url, urlErr := adminUIURL(cfg.ListenAddr); urlErr != nil {
-			slog.Warn("running instance found, but its URL could not be resolved", "error", urlErr)
-		} else if browserErr := openBrowser(url); browserErr != nil {
-			slog.Warn("running instance found, but opening its UI failed", "url", url, "error", browserErr)
-		}
+		logger.Info("another instance already holds the application lock; opening its UI")
+		openExistingUI(cfg, logger)
 		return
 	}
 	defer releaseInstanceLock()
 
-	logger := slog.New(slog.NewJSONHandler(os.Stdout, nil))
-	slog.SetDefault(logger)
+	switch checkPortAvailability(cfg, logger) {
+	case startupHandoff:
+		return
+	case startupBlocked:
+		os.Exit(1)
+	}
 
 	app, err := server.New(cfg, logger)
 	if err != nil {
@@ -59,8 +63,15 @@ func main() {
 		ReadTimeout:       60 * time.Second,
 		IdleTimeout:       120 * time.Second,
 	}
+
 	listener, err := net.Listen("tcp", cfg.ListenAddr)
 	if err != nil {
+		switch handleListenFailure(cfg, logger, err) {
+		case startupHandoff:
+			return
+		case startupBlocked:
+			os.Exit(1)
+		}
 		logger.Error("failed to listen", "addr", cfg.ListenAddr, "error", err)
 		showFatalError("Codex Model Tester 无法启动本地服务", err)
 		os.Exit(1)

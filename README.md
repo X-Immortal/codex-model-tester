@@ -195,6 +195,14 @@ same proxy is used for OAuth account login, Codex HTTP/SSE requests, and
 upstream WebSocket connections. Proxy settings are detected when the app
 starts; restart the app after changing them.
 
+Before starting a backend the app checks the local service port. If another
+program owns it, the startup message names that program and suggests a
+different `PORT`. If the port is already served by this app — including an
+instance started from a different `DATA_DIR` — the existing Web UI is opened
+instead of starting a second backend. `/health/live` answers with
+`"service":"codex-model-tester"` so a second launch can recognize the running
+backend as its own.
+
 ## Windows application
 
 The Windows release is one portable executable containing the Go backend and
