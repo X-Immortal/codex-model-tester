@@ -77,3 +77,72 @@ func proxyFromSystemValues(values map[string]string) string {
 	}
 	return ""
 }
+
+// windowsProxyTokens lists the protocol tokens WinINET accepts in the
+// ProxyServer value. A value that uses one of them is a per-protocol list
+// rather than a single proxy, even when the token is one this application
+// never routes through (ftp, file).
+var windowsProxyTokens = map[string]bool{
+	"http":  true,
+	"https": true,
+	"ftp":   true,
+	"file":  true,
+	"socks": true,
+}
+
+// proxyFromWindowsServer converts the WinINET ProxyServer value into the
+// single upstream proxy used by the application. Windows accepts either one
+// proxy for every protocol (host:port) or a semicolon-separated list such as
+// "http=host:port;https=host:port;socks=host:port". The named entries describe
+// the destination protocol, so both HTTP and HTTPS entries normally point to an
+// HTTP CONNECT proxy. Upstream traffic is HTTPS, so an "https" entry wins over
+// an "http" entry and SOCKS is only used when neither is present.
+func proxyFromWindowsServer(raw string) string {
+	raw = strings.TrimSpace(raw)
+	if raw == "" {
+		return ""
+	}
+
+	proxies, listed := parseWindowsProxyList(raw)
+	if !listed {
+		return normalizeProxyURL(raw)
+	}
+	for _, name := range []string{"https", "http"} {
+		if proxy := normalizeProxyURL(proxies[name]); proxy != "" {
+			return proxy
+		}
+	}
+	if proxy := strings.TrimSpace(proxies["socks"]); proxy != "" {
+		if !strings.Contains(proxy, "://") {
+			proxy = "socks5://" + proxy
+		}
+		if normalized := normalizeProxyURL(proxy); normalized != "" {
+			return normalized
+		}
+	}
+	return ""
+}
+
+// parseWindowsProxyList splits a WinINET per-protocol list. It reports whether
+// any entry used a protocol token, so a single proxy whose credentials happen
+// to contain "=" is still treated as one proxy. Entries with an empty value are
+// recorded as a list but contribute no proxy.
+func parseWindowsProxyList(raw string) (map[string]string, bool) {
+	proxies := make(map[string]string)
+	listed := false
+	for _, entry := range strings.Split(raw, ";") {
+		name, value, found := strings.Cut(entry, "=")
+		if !found {
+			continue
+		}
+		name = strings.ToLower(strings.TrimSpace(name))
+		if !windowsProxyTokens[name] {
+			continue
+		}
+		listed = true
+		if value = strings.TrimSpace(value); value != "" {
+			proxies[name] = value
+		}
+	}
+	return proxies, listed
+}

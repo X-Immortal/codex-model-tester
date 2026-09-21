@@ -188,9 +188,12 @@ Docker Compose intentionally requires a stable value), `PORT` (`8080`),
 `OPEN_BROWSER` (`true` for direct runs, disabled by the Docker config), and
 `UPSTREAM_PROXY` (optional explicit HTTP/HTTPS proxy for upstream requests).
 When `UPSTREAM_PROXY` is unset, the app uses `HTTPS_PROXY`/`HTTP_PROXY` and, on
-macOS, falls back to the HTTP/HTTPS proxy configured in System Settings. The
+macOS, falls back to the HTTP/HTTPS proxy configured in System Settings. On
+Windows, it reads the enabled per-user WinINET proxy configured in Windows
+Settings (including the proxy written by Clash Verge System Proxy mode). The
 same proxy is used for OAuth account login, Codex HTTP/SSE requests, and
-upstream WebSocket connections.
+upstream WebSocket connections. Proxy settings are detected when the app
+starts; restart the app after changing them.
 
 ## Windows application
 
